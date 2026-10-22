@@ -30,7 +30,7 @@ class TitleAdapter(
         holder.name.text = t.name
         holder.card.contentDescription = t.name
         ImageLoader.load(holder.art.context, Tmdb.imageUrl(t.backdrop, "w500"), holder.art, 520)
-        Cards.bindFocus(holder.card, 0xFF5B8CFF.toInt()) { onFocus(t, row) }
+        Cards.bindFocus(holder.card) { onFocus(t, row) }
         holder.card.setOnClickListener { onClick(t, row) }
         holder.card.setOnLongClickListener { onLongClick(t, row); true }
     }

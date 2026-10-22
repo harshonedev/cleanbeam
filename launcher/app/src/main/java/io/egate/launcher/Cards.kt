@@ -8,7 +8,7 @@ import android.view.View
 import android.view.animation.OvershootInterpolator
 import android.view.animation.PathInterpolator
 
-/** Focus look shared by app cards and title cards: overshoot scale, white ring, colored shadow. */
+/** Focus look shared by app, title and settings cards: overshoot scale and a white ring. */
 object Cards {
     private val overshoot = OvershootInterpolator(1.6f)
     private val settle = PathInterpolator(0.2f, 0f, 0f, 1f)
@@ -21,16 +21,14 @@ object Cards {
         card.foreground = focusRing(card)
     }
 
-    fun bindFocus(card: View, shadow: Int, onFocus: () -> Unit) {
-        card.outlineSpotShadowColor = shadow
-        card.outlineAmbientShadowColor = shadow
+    /** Focus look: overshoot scale and the white ring. Cards stay flat (no elevation shadow). */
+    fun bindFocus(card: View, onFocus: () -> Unit) {
         card.setOnFocusChangeListener { v, hasFocus ->
             val scale = if (hasFocus) 1.12f else 1.0f
             v.animate().scaleX(scale).scaleY(scale)
                 .setDuration(if (hasFocus) 320 else 200)
                 .setInterpolator(if (hasFocus) overshoot else settle)
                 .start()
-            v.elevation = if (hasFocus) dp(v, 14f) else dp(v, 2f)
             if (hasFocus) onFocus()
         }
     }

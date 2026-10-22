@@ -21,6 +21,8 @@ class Prefs(context: Context) {
             Accent("Pink",   Color.parseColor("#FF5C8A")),
             Accent("Purple", Color.parseColor("#9B6CFF"))
         )
+        /** Package-name fragments, in display order. */
+        val DEFAULT_FAVORITES = listOf("youtube", "netflix", "hotstar", "amazonvideo", "primevideo")
         const val MIN_COLS = 4
         const val MAX_COLS = 7
     }
@@ -125,6 +127,19 @@ class Prefs(context: Context) {
     }
 
     fun isFavorite(pkg: String) = favorites().contains(pkg)
+
+    /**
+     * Once per install: pin the big streaming apps that are installed, in this order, ahead of
+     * anything already pinned. Never runs again, so a user who unpins them stays unpinned.
+     */
+    fun seedFavorites(installedPkgs: List<String>) {
+        if (sp.getBoolean("favorites_seeded", false) || installedPkgs.isEmpty()) return
+        val seed = ArrayList<String>()
+        for (frag in DEFAULT_FAVORITES) installedPkgs.firstOrNull { it.lowercase().contains(frag) }?.let { if (it !in seed) seed += it }
+        for (pkg in favorites()) if (pkg !in seed) seed += pkg
+        saveFavorites(seed)
+        sp.edit().putBoolean("favorites_seeded", true).apply()
+    }
 
     fun toggleFavorite(pkg: String) {
         val f = favorites()

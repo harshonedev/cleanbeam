@@ -17,7 +17,8 @@ class AppAdapter(
     private var items: List<AppInfo>,
     private val onClick: (AppInfo) -> Unit,
     private val onLongClick: (AppInfo) -> Unit,
-    private val onFocus: (AppInfo) -> Unit
+    private val onFocus: (AppInfo) -> Unit,
+    private val layout: Int = R.layout.item_app
 ) : RecyclerView.Adapter<AppAdapter.VH>() {
 
     /** Set before the first submit so the cards slide in once; cleared after the first layout. */
@@ -34,7 +35,7 @@ class AppAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context).inflate(R.layout.item_app, parent, false)
+        val v = LayoutInflater.from(parent.context).inflate(layout, parent, false)
         val vh = VH(v)
         vh.card.clipToOutline = true
         vh.card.foreground = focusRing(vh.card)
@@ -56,8 +57,6 @@ class AppAdapter(
             holder.icon.setImageDrawable(app.icon)
             holder.label.text = app.label
         }
-        card.outlineSpotShadowColor = app.color
-        card.outlineAmbientShadowColor = app.color
         card.contentDescription = app.label
 
         card.setOnClickListener { onClick(app) }
@@ -68,7 +67,6 @@ class AppAdapter(
                 .setDuration(if (hasFocus) 320 else 200)
                 .setInterpolator(if (hasFocus) overshoot else settle)
                 .start()
-            v.elevation = if (hasFocus) dp(v, 14f) else dp(v, 2f)
             if (hasFocus) onFocus(app)
         }
 

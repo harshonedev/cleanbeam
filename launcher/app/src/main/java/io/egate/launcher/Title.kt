@@ -12,10 +12,16 @@ data class Title(
     val poster: String?
 )
 
-/** A horizontal shelf on the Home tab. providerPkg is the installed app that carries these titles. */
+/**
+ * A horizontal shelf on the Home tab: either TMDB titles (providerPkg is the installed app that
+ * carries them) or, when [apps] is set, a row of app cards such as Favorites.
+ */
 data class HomeRow(
     val header: String,
     val titles: List<Title>,
     val providerPkg: String?,
-    val providerName: String?
-)
+    val providerName: String?,
+    val apps: List<AppInfo> = emptyList()
+) {
+    val isAppRow get() = apps.isNotEmpty()
+}

@@ -27,12 +27,15 @@ import android.text.format.DateUtils
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.animation.PathInterpolator
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,7 +43,7 @@ import java.util.concurrent.Executors
 
 class LauncherActivity : AppCompatActivity() {
 
-    private enum class Tab { HOME, APPS, FAVORITES }
+    private enum class Tab { HOME, APPS, FAVORITES, SETTINGS }
 
     private lateinit var prefs: Prefs
     private lateinit var root: View
@@ -54,6 +57,16 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var underline: View
     private lateinit var clock: TextView
     private lateinit var wifi: ImageView
+    private lateinit var phone: ImageView
+    private lateinit var actions: View
+    private lateinit var actOpen: TextView
+    private lateinit var actPin: TextView
+    private lateinit var actShortcut: TextView
+    private lateinit var actInfo: TextView
+    private lateinit var grid: RecyclerView
+    private lateinit var gridAdapter: AppAdapter
+    private lateinit var tileAdapter: TileAdapter
+    private lateinit var remote: RemoteLink
     private lateinit var hero: View
     private lateinit var heroTitle: TextView
     private lateinit var heroSubtitle: TextView
@@ -73,7 +86,7 @@ class LauncherActivity : AppCompatActivity() {
     private var homeLoadedAt = 0L
     private var homeLoading = false
     private var tab = Tab.APPS
-    private var heroItem: Any? = null          // AppInfo or Pair<Title, HomeRow>
+    private var heroItem: Any? = null          // AppInfo, Pair<Title, HomeRow> or Tile
     private var bgFront = false                // which bg layer is visible: false = A, true = B
     private var tintColor = 0
     private var tintAnim: ValueAnimator? = null
@@ -90,6 +103,7 @@ class LauncherActivity : AppCompatActivity() {
         when (val it = heroItem) {
             is AppInfo -> renderAppHero(it, animate = true)
             is Pair<*, *> -> renderTitleHero(it.first as Title, it.second as HomeRow)
+            is Tile -> renderTileHero(it)
         }
     }
 
@@ -121,6 +135,13 @@ class LauncherActivity : AppCompatActivity() {
         underline = findViewById(R.id.tab_underline)
         clock = findViewById(R.id.clock)
         wifi = findViewById(R.id.wifi)
+        phone = findViewById(R.id.phone)
+        actions = findViewById(R.id.actions)
+        actOpen = findViewById(R.id.act_open)
+        actPin = findViewById(R.id.act_pin)
+        actShortcut = findViewById(R.id.act_shortcut)
+        actInfo = findViewById(R.id.act_info)
+        grid = findViewById(R.id.apps_grid)
         hero = findViewById(R.id.hero)
         heroTitle = findViewById(R.id.hero_title)
         heroSubtitle = findViewById(R.id.hero_subtitle)
@@ -139,7 +160,7 @@ class LauncherActivity : AppCompatActivity() {
         setupTab(tabHome) { selectTab(Tab.HOME) }
         setupTab(tabApps) { selectTab(Tab.APPS) }
         setupTab(tabFavorites) { selectTab(Tab.FAVORITES) }
-        setupTab(tabSettings, selectOnFocus = false) { showOptions() }
+        setupTab(tabSettings) { selectTab(Tab.SETTINGS) }
 
         adapter = AppAdapter(emptyList(),
             onClick = { launchApp(it) },
@@ -151,10 +172,39 @@ class LauncherActivity : AppCompatActivity() {
         shelvesAdapter = HomeRowsAdapter(
             onClick = { t, r -> openTitle(t, r) },
             onLongClick = { t, r -> titleMenu(t, r) },
-            onFocus = { t, r -> onCardFocused(t to r) })
+            onFocus = { t, r -> onCardFocused(t to r) },
+            onAppClick = { launchApp(it) },
+            onAppLongClick = { appMenu(it) },
+            onAppFocus = { onCardFocused(it) })
         shelvesAdapter.upTarget = tabHome
         shelves.adapter = shelvesAdapter
         shelves.itemAnimator = null
+
+        gridAdapter = AppAdapter(emptyList(),
+            onClick = { launchApp(it) },
+            onLongClick = { appMenu(it) },
+            onFocus = { onCardFocused(it) })
+        tileAdapter = TileAdapter(onClick = { it.action() }, onFocus = { onCardFocused(it) })
+        grid.adapter = gridAdapter
+        grid.itemAnimator = null
+        grid.layoutManager = ParkingGridLayoutManager(this, 4)
+        // Like the shelves: clip to our own bounds so rows scrolled above the top edge don't paint over the hero.
+        grid.outlineProvider = ViewOutlineProvider.BOUNDS
+        grid.clipToOutline = true
+        // The grid is hidden at start, so size the columns whenever its width actually changes.
+        grid.addOnLayoutChangeListener { v, l, _, r, _, ol, _, or_, _ ->
+            if (r - l == or_ - ol) return@addOnLayoutChangeListener
+            val cell = Cards.dp(v, 230f)
+            val cols = ((r - l - v.paddingLeft - v.paddingRight) / cell).toInt().coerceIn(3, 6)
+            val lm = grid.layoutManager as GridLayoutManager
+            if (lm.spanCount != cols) grid.post { lm.spanCount = cols }
+        }
+        actOpen.setOnClickListener { (heroItem as? AppInfo)?.let { launchApp(it) } }
+        actPin.setOnClickListener { (heroItem as? AppInfo)?.let { prefs.toggleFavorite(it.packageName); refreshIfFavorites(); bindActions(it) } }
+        actShortcut.setOnClickListener { (heroItem as? AppInfo)?.let { captureShortcut(it) } }
+        actInfo.setOnClickListener { (heroItem as? AppInfo)?.let { appInfo(it) } }
+
+        remote = RemoteLink(this) { updateRemoteIndicator(); if (tab == Tab.SETTINGS) refreshTiles() }
 
         tab = if (Tmdb.configured(this)) Tab.HOME else Tab.APPS
         row.upTarget = currentTabView()
@@ -178,6 +228,11 @@ class LauncherActivity : AppCompatActivity() {
         })
         if (!firstLoad) reloadApps()
         ensureScreensaver()
+        remote.start()
+    }
+
+    private fun updateRemoteIndicator() {
+        phone.visibility = if (remote.connected) View.VISIBLE else View.GONE
     }
 
     /** Vendor apps (jixin settings) re-point the screensaver on boot; reassert ours. */
@@ -199,14 +254,18 @@ class LauncherActivity : AppCompatActivity() {
         handler.removeCallbacks(tick)
         runCatching { unregisterReceiver(timeReceiver) }
         runCatching { unregisterReceiver(packageReceiver) }
+        remote.stop()
     }
 
     override fun onDestroy() { super.onDestroy(); io.shutdownNow() }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        if (tab == Tab.HOME) { shelves.scrollToPosition(0); focusFirstShelfCard() }
-        else { row.scrollToPosition(0); row.post { firstCard(row)?.requestFocus() } }
+        when (tab) {
+            Tab.HOME -> { shelves.scrollToPosition(0); focusFirstShelfCard() }
+            Tab.APPS, Tab.SETTINGS -> { grid.scrollToPosition(0); grid.post { firstGridCard()?.requestFocus() } }
+            Tab.FAVORITES -> { row.scrollToPosition(0); row.post { firstCard(row)?.requestFocus() } }
+        }
     }
 
     override fun onBackPressed() { /* home: swallow */ }
@@ -239,9 +298,10 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun currentTabView(): TextView = when (tab) {
-        Tab.HOME -> tabHome; Tab.APPS -> tabApps; Tab.FAVORITES -> tabFavorites
+        Tab.HOME -> tabHome; Tab.APPS -> tabApps; Tab.FAVORITES -> tabFavorites; Tab.SETTINGS -> tabSettings
     }
 
+    /** Focused and selected tabs are white, the rest grey. */
     private fun paintTabs() {
         for (t in listOf(tabHome, tabApps, tabFavorites, tabSettings)) {
             val active = t === currentTabView() || t.hasFocus()
@@ -249,22 +309,39 @@ class LauncherActivity : AppCompatActivity() {
         }
     }
 
+    private var underlineAnim: ValueAnimator? = null
+
+    /**
+     * Tab indicator: a line under the focused tab, a dot under the selected tab once focus has
+     * moved on. Position, width and height animate together so one morphs into the other.
+     */
     private fun moveUnderline(target: View, animate: Boolean) {
-        val x = target.left + (target.parent as View).left + target.paddingLeft
-        val w = target.width - target.paddingLeft - target.paddingRight
-        if (w <= 0) return
+        val labelW = target.width - target.paddingLeft - target.paddingRight
+        if (labelW <= 0) return
+        val line = target.hasFocus()
+        val dot = Cards.dp(underline, 6f).toInt()
+        val h = if (line) Cards.dp(underline, 3f).toInt() else dot
+        val w = if (line) labelW else dot
+        val x = target.left + (target.parent as View).left + target.paddingLeft + (labelW - w) / 2
+        val tx = (x - underline.left).toFloat()
+        underlineAnim?.cancel()
         if (!animate) {
-            underline.translationX = (x - underline.left).toFloat()
-            underline.layoutParams = underline.layoutParams.apply { width = w }
+            underline.translationX = tx
+            underline.layoutParams = underline.layoutParams.apply { width = w; height = h }
             return
         }
-        underline.animate().translationX((x - underline.left).toFloat())
-            .setDuration(260).setInterpolator(ease).start()
-        val from = underline.width
-        ValueAnimator.ofInt(from, w).apply {
-            duration = 260; interpolator = ease
-            addUpdateListener { underline.layoutParams = underline.layoutParams.apply { width = it.animatedValue as Int } }
-        }.start()
+        val fromX = underline.translationX; val fromW = underline.width; val fromH = underline.height
+        underlineAnim = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 280; interpolator = ease
+            addUpdateListener {
+                val f = it.animatedValue as Float
+                underline.translationX = fromX + (tx - fromX) * f
+                underline.layoutParams = underline.layoutParams.apply {
+                    width = (fromW + (w - fromW) * f).toInt(); height = (fromH + (h - fromH) * f).toInt()
+                }
+            }
+            start()
+        }
     }
 
     private fun selectTab(t: Tab) {
@@ -372,22 +449,114 @@ class LauncherActivity : AppCompatActivity() {
             Log.i("EGate", "loaded ${apps.size} apps in ${System.currentTimeMillis() - t0}ms")
             handler.post {
                 allApps = apps
+                prefs.seedFavorites(apps.map { it.packageName })
                 populate(animate = firstLoad)
                 firstLoad = false
             }
         }
     }
 
-    private fun visibleApps(): List<AppInfo> = when (tab) {
-        Tab.FAVORITES -> {
-            val byPkg = allApps.associateBy { it.packageName }
-            prefs.favorites().mapNotNull { byPkg[it] }
-        }
-        else -> allApps
-    }
+    private fun visibleApps(): List<AppInfo> = if (tab == Tab.FAVORITES) favoriteApps() else allApps
 
     private fun populate(animate: Boolean) {
-        if (tab == Tab.HOME) populateHome() else populateRow(animate)
+        actions.visibility = if (tab == Tab.APPS) View.VISIBLE else View.GONE
+        when (tab) {
+            Tab.HOME -> populateHome()
+            Tab.APPS -> populateGrid(animate)
+            Tab.FAVORITES -> populateRow(animate)
+            Tab.SETTINGS -> populateSettings()
+        }
+    }
+
+    // ---------- settings tab: quick-action tiles ----------
+    private fun tiles(): List<Tile> {
+        val out = ArrayList<Tile>()
+        out += Tile("Phone remote", "Remote", remote.summary()) {
+            remote.pairingIntent()?.let { safeStart(it) } ?: toast("EGate Remote isn't installed")
+        }
+        for ((s, intent) in SystemShortcuts.available(this)) {
+            // Live state where the system lets us read it; the shortcut's own blurb otherwise.
+            val detail = when (s.label) {
+                "Wi-Fi" -> DeviceInfo.wifi(this)
+                "Bluetooth" -> DeviceInfo.bluetooth(this)
+                "System settings" -> DeviceInfo.system()
+                "Projector settings" -> DeviceInfo.firmware()
+                else -> s.detail
+            }
+            out += Tile(s.label, s.group, detail) { safeStart(intent) }
+        }
+        val ver = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?"
+        out += Tile("Launcher", "This launcher", "EGate Home $ver  ·  accent ${Prefs.ACCENTS[prefs.accentIndex].name}  ·  region $region") { showLauncherOptions() }
+        return out
+    }
+
+    private fun populateSettings() {
+        remote.query()
+        row.visibility = View.GONE
+        shelves.visibility = View.GONE
+        empty.visibility = View.GONE
+        grid.visibility = View.VISIBLE
+        if (grid.adapter !== tileAdapter) grid.adapter = tileAdapter
+        val list = tiles()
+        tileAdapter.submit(list)
+        grid.scrollToPosition(0)
+        val focused = currentFocus
+        val focusInGrid = focused != null && grid.findContainingItemView(focused) != null
+        if (focusInGrid || focused == null) grid.post { firstGridCard()?.requestFocus() }
+        if (!focusInGrid) onCardFocused(list[0])
+    }
+
+    /** Re-render tile text in place (e.g. the phone remote line) without disturbing focus. */
+    private fun refreshTiles() {
+        val list = tiles()
+        tileAdapter.submit(list)
+        (heroItem as? Tile)?.let { cur -> list.firstOrNull { it.title == cur.title }?.let { heroItem = it; renderTileHero(it) } }
+    }
+
+    private fun renderTileHero(t: Tile) {
+        swapHero(animate = true) {
+            heroTitle.text = t.title
+            heroSubtitle.text = t.subtitle
+            heroMeta.text = t.detail
+            heroMeta.visibility = View.VISIBLE
+            heroBody.visibility = View.GONE
+        }
+        if (wallpaperKey.isEmpty()) crossfadeArt(null)
+        animateTint(prefs.accentColor)
+    }
+
+    private fun favoriteApps(): List<AppInfo> {
+        val byPkg = allApps.associateBy { it.packageName }
+        return prefs.favorites().mapNotNull { byPkg[it] }
+    }
+
+    // ---------- apps grid (Apps tab) ----------
+    private fun populateGrid(animate: Boolean) {
+        row.visibility = View.GONE
+        shelves.visibility = View.GONE
+        empty.visibility = View.GONE
+        grid.visibility = View.VISIBLE
+        if (grid.adapter !== gridAdapter) grid.adapter = gridAdapter
+        gridAdapter.entrance = animate
+        gridAdapter.submit(allApps)
+        grid.scrollToPosition(0)
+        if (animate) grid.post { gridAdapter.entrance = false }
+        if (allApps.isEmpty()) return
+        val focused = currentFocus
+        val focusInGrid = focused != null && grid.findContainingItemView(focused) != null
+        if (focusInGrid || focused == null) grid.post { firstGridCard()?.requestFocus() }
+        if (!focusInGrid || (heroItem as? AppInfo)?.let { it !in allApps } != false) onCardFocused(allApps[0])
+        (heroItem as? AppInfo)?.let { bindActions(it) }
+    }
+
+    private fun firstGridCard(): View? = grid.getChildAt(0)?.findViewById(R.id.card)
+
+    private fun bindActions(app: AppInfo) {
+        actPin.text = if (prefs.isFavorite(app.packageName)) "Unpin" else "Pin"
+    }
+
+    private fun appInfo(app: AppInfo) {
+        safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:${app.packageName}")))
     }
 
     private fun showEmpty(title: Int, hint: Int) {
@@ -401,6 +570,7 @@ class LauncherActivity : AppCompatActivity() {
     private fun populateRow(animate: Boolean) {
         val list = visibleApps()
         shelves.visibility = View.GONE
+        grid.visibility = View.GONE
         adapter.entrance = animate
         adapter.submit(list)
         row.scrollToPosition(0)
@@ -414,27 +584,38 @@ class LauncherActivity : AppCompatActivity() {
         empty.visibility = View.GONE
         val focused = currentFocus
         val focusInRow = focused != null && row.findContainingItemView(focused) != null
-        val cur = heroItem as? AppInfo
-        if (cur == null || !list.contains(cur) || focusInRow) {
-            if (focused == null || focusInRow || cur == null) row.post { firstCard(row)?.requestFocus() }
-            if (cur == null || !list.contains(cur)) onCardFocused(list[0])
-        }
+        // Browsing the row (or nothing focused): land on the first card. On a tab: leave focus there.
+        if (focusInRow || focused == null) row.post { firstCard(row)?.requestFocus() }
+        // Entering the tab shows its first item; a refresh mid-browse keeps the one in view.
+        if (!focusInRow || (heroItem as? AppInfo)?.let { it !in list } != false) onCardFocused(list[0])
     }
 
     // ---------- home (TMDB) ----------
+    /** Favorites shelf first, then the TMDB shelves. */
+    private fun displayRows(): List<HomeRow> {
+        val favs = favoriteApps()
+        val favRow = if (favs.isEmpty()) emptyList() else listOf(HomeRow(getString(R.string.tab_favorites), emptyList(), null, null, favs))
+        return favRow + homeRows
+    }
+
     private fun populateHome() {
         row.visibility = View.GONE
-        if (!Tmdb.configured(this)) {
+        grid.visibility = View.GONE
+        val configured = Tmdb.configured(this)
+        val rows = displayRows()
+        if (rows.isEmpty()) {
             shelves.visibility = View.GONE
             shelvesAdapter.submit(emptyList())
-            showEmpty(R.string.home_no_token, R.string.home_no_token_hint)
+            if (!configured) showEmpty(R.string.home_no_token, R.string.home_no_token_hint)
+            else if (!homeLoading || allApps.isEmpty()) showEmpty(R.string.home_empty, R.string.home_empty_hint)
+            if (configured && allApps.isNotEmpty() && !homeLoading) loadHome()
             return
         }
         empty.visibility = View.GONE
         shelves.visibility = View.VISIBLE
+        showShelves(rows)
+        if (!configured) return
         val stale = System.currentTimeMillis() - homeLoadedAt > Tmdb.ROWS_TTL
-        if (homeRows.isNotEmpty()) showShelves(homeRows)
-        else { heroTitle.text = getString(R.string.home_loading); heroSubtitle.text = ""; heroMeta.visibility = View.GONE; heroBody.visibility = View.GONE; hero.alpha = 1f }
         if ((stale || homeRows.isEmpty()) && !homeLoading && allApps.isNotEmpty()) loadHome()
     }
 
@@ -449,8 +630,9 @@ class LauncherActivity : AppCompatActivity() {
                 homeLoading = false
                 if (rows.isNotEmpty()) { homeRows = rows; homeLoadedAt = System.currentTimeMillis() }
                 if (tab != Tab.HOME) return@post
-                if (homeRows.isEmpty()) { shelves.visibility = View.GONE; showEmpty(R.string.home_empty, R.string.home_empty_hint) }
-                else if (rows.isNotEmpty()) showShelves(rows)
+                val all = displayRows()
+                if (all.isEmpty()) { shelves.visibility = View.GONE; showEmpty(R.string.home_empty, R.string.home_empty_hint) }
+                else if (rows.isNotEmpty()) showShelves(all)
             }
         }
     }
@@ -458,15 +640,19 @@ class LauncherActivity : AppCompatActivity() {
     private fun showShelves(rows: List<HomeRow>) {
         shelves.visibility = View.VISIBLE
         empty.visibility = View.GONE
+        val before = currentFocus
+        val focusWasInShelves = before != null && shelves.findContainingItemView(before) != null
         shelvesAdapter.submit(rows)
         shelves.scrollToPosition(0)
         val focused = currentFocus
-        val focusInTabs = focused != null && focused.parent === tabHome.parent
-        val cur = heroItem as? Pair<*, *>
-        if (cur == null || !rows.contains(cur.second)) {
-            onCardFocused(rows[0].titles[0] to rows[0])
-            // Cold start: land on the first card. Later refreshes leave a user who is on the tabs alone.
-            if (!focusInTabs || homeFirstShow) focusFirstShelfCard()
+        val focusInShelves = focused != null && shelves.findContainingItemView(focused) != null
+        // A full rebind recreates the cards; if that took focus away, put it back on the first card.
+        if (focusWasInShelves && !focusInShelves) focusFirstShelfCard()
+        if (!focusInShelves && !focusWasInShelves) {
+            val first = rows[0]
+            onCardFocused(if (first.isAppRow) first.apps[0] else first.titles[0] to first)
+            // Cold start (or nothing focused): land on the first card. From a tab: leave focus on the tab.
+            if (focused == null || homeFirstShow) focusFirstShelfCard()
         }
         homeFirstShow = false
     }
@@ -474,12 +660,13 @@ class LauncherActivity : AppCompatActivity() {
     private fun firstCard(rv: View?): View? =
         (rv as? FocusRowRecyclerView)?.getChildAt(0)?.findViewById(R.id.card)
 
-    private fun focusFirstShelfCard() {
+    private fun focusFirstShelfCard(attempt: Int = 0) {
         shelves.post {
             val inner = shelves.getChildAt(0)?.findViewById<FocusRowRecyclerView>(R.id.row_titles)
             val card = firstCard(inner)
             if (card != null) card.requestFocus()
-            else inner?.post { firstCard(inner)?.requestFocus() }
+            else if (attempt < 8 && tab == Tab.HOME) handler.postDelayed({ focusFirstShelfCard(attempt + 1) }, 60)
+            else Log.w("EGate", "first shelf card not found after $attempt attempts")
         }
     }
 
@@ -504,6 +691,7 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun renderAppHero(app: AppInfo, animate: Boolean) {
+        if (tab == Tab.APPS) bindActions(app)
         val subtitle = listOfNotNull(
             app.category?.let { "$it app" },
             shortVersion(app.version)?.let { "version $it" }
@@ -637,17 +825,21 @@ class LauncherActivity : AppCompatActivity() {
             actions += "Pin to favorites" to { prefs.toggleFavorite(app.packageName); refreshIfFavorites() }
         }
         actions += "Assign remote button" to { captureShortcut(app) }
-        actions += "App info" to {
-            safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                .setData(Uri.parse("package:${app.packageName}")))
-        }
+        actions += "App info" to { appInfo(app) }
         AlertDialog.Builder(this)
             .setTitle(app.label)
             .setItems(actions.map { it.first }.toTypedArray()) { _, i -> actions[i].second() }
             .show()
     }
 
-    private fun refreshIfFavorites() { if (tab == Tab.FAVORITES) populateRow(animate = false) }
+    private fun refreshIfFavorites() {
+        when (tab) {
+            Tab.FAVORITES -> populateRow(animate = false)
+            Tab.HOME -> shelvesAdapter.submit(displayRows())
+            Tab.APPS -> (heroItem as? AppInfo)?.let { bindActions(it) }
+            Tab.SETTINGS -> {}
+        }
+    }
 
     // ---------- remote shortcut capture ----------
     private val reservedKeys = setOf(
@@ -679,7 +871,7 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     // ---------- options ----------
-    private fun showOptions() {
+    private fun showLauncherOptions() {
         val tokenState = if (Tmdb.configured(this)) "Set" else "Not set"
         val labels = arrayOf(
             "TMDB access token: $tokenState",
@@ -693,32 +885,28 @@ class LauncherActivity : AppCompatActivity() {
             "24-hour clock: ${onOff(prefs.clock24h)}",
             "Show seconds: ${onOff(prefs.showSeconds)}",
             "Remote shortcuts…",
-            "Keep Wi-Fi awake in standby: ${onOff(prefs.keepAwake)}",
-            "Wi-Fi settings",
-            "System settings"
+            "Keep Wi-Fi awake in standby: ${onOff(prefs.keepAwake)}"
         )
         AlertDialog.Builder(this)
-            .setTitle("Settings")
+            .setTitle("Launcher settings")
             .setItems(labels) { _, which ->
                 when (which) {
                     0 -> enterToken()
                     1 -> pickRegion()
                     2 -> { Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0; if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME) }
                     3 -> pickAccent()
-                    4 -> { prefs.appGlow = !prefs.appGlow; retint(); showOptions() }
+                    4 -> { prefs.appGlow = !prefs.appGlow; retint(); showLauncherOptions() }
                     5 -> wallpaperMenu()
-                    6 -> { prefs.ambientSky = !prefs.ambientSky; root.background = Sky.drawable(prefs.ambientSky); showOptions() }
-                    7 -> { prefs.showStats = !prefs.showStats; updateClock(); showOptions() }
-                    8 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showOptions() }
-                    9 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showOptions() }
+                    6 -> { prefs.ambientSky = !prefs.ambientSky; root.background = Sky.drawable(prefs.ambientSky); showLauncherOptions() }
+                    7 -> { prefs.showStats = !prefs.showStats; updateClock(); showLauncherOptions() }
+                    8 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showLauncherOptions() }
+                    9 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showLauncherOptions() }
                     10 -> shortcutsManager()
                     11 -> {
                         prefs.keepAwake = !prefs.keepAwake
                         if (prefs.keepAwake) KeepAliveService.start(this) else KeepAliveService.stop(this)
-                        showOptions()
+                        showLauncherOptions()
                     }
-                    12 -> safeStart(Intent(Settings.ACTION_WIFI_SETTINGS))
-                    13 -> safeStart(Intent(Settings.ACTION_SETTINGS))
                 }
             }
             .show()
@@ -751,7 +939,7 @@ class LauncherActivity : AppCompatActivity() {
                 prefs.region = codes[i]
                 Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
                 d.dismiss()
-                if (tab == Tab.HOME) populateHome() else showOptions()
+                if (tab == Tab.HOME) populateHome() else showLauncherOptions()
             }.show()
     }
 
@@ -761,7 +949,7 @@ class LauncherActivity : AppCompatActivity() {
         val names = Prefs.ACCENTS.map { it.name }.toTypedArray()
         AlertDialog.Builder(this).setTitle("Accent color")
             .setSingleChoiceItems(names, prefs.accentIndex) { d, i ->
-                prefs.accentIndex = i; retint(); d.dismiss(); showOptions()
+                prefs.accentIndex = i; retint(); d.dismiss(); showLauncherOptions()
             }.show()
     }
 
