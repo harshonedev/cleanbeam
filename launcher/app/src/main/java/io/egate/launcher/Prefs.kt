@@ -101,6 +101,10 @@ class Prefs(context: Context) {
         val m = shortcuts(); m.remove(keyCode); saveShortcuts(m)
     }
 
+    var keepAwake: Boolean
+        get() = sp.getBoolean("keep_awake", false)
+        set(v) = sp.edit().putBoolean("keep_awake", v).apply()
+
     // ----- favorites (ordered list of package names) -----
     fun favorites(): MutableList<String> {
         val raw = sp.getString("favorites", "") ?: ""

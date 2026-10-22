@@ -20,8 +20,11 @@ class PairingStore(private val backing: Backing) : io.egate.remote.router.Creden
     override val token: String
         get() = backing.read() ?: regenerate()
 
+    /** Active on-screen PIN, or null when none is valid. Guarded by [lock]. */
     @Volatile
-    override var pairingPin: String? = null
+    var pairingPin: String? = null
+        private set
+    private val lock = Any()
 
     fun regenerate(): String {
         val bytes = ByteArray(32).also { random.nextBytes(it) }
@@ -32,20 +35,24 @@ class PairingStore(private val backing: Backing) : io.egate.remote.router.Creden
 
     private var pinFailures = 0
 
-    fun newPin(): String {
+    fun newPin(): String = synchronized(lock) {
         val pin = "%06d".format(random.nextInt(1_000_000))
         pinFailures = 0
         pairingPin = pin
-        return pin
+        pin
     }
 
-    @Synchronized
-    override fun onPairFailed() {
-        if (++pinFailures >= MAX_PIN_FAILURES) pairingPin = null
-    }
+    fun clearPin() = synchronized(lock) { pairingPin = null }
 
-    override fun onPaired() {
-        pairingPin = null
+    override fun tryPair(code: String): Boolean = synchronized(lock) {
+        val pin = pairingPin ?: return false
+        val ok = MessageDigest.isEqual(sha256(code), sha256(pin))
+        if (ok) {
+            pairingPin = null
+        } else if (++pinFailures >= MAX_PIN_FAILURES) {
+            pairingPin = null
+        }
+        ok
     }
 
     override fun matches(candidate: String): Boolean {

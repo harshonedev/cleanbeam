@@ -46,7 +46,7 @@ class PairingActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        store.pairingPin = null
+        store.clearPin()
         super.onPause()
     }
 

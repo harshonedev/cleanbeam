@@ -276,7 +276,8 @@ class LauncherActivity : AppCompatActivity() {
             "24-hour clock: ${onOff(prefs.clock24h)}",
             "Show seconds: ${onOff(prefs.showSeconds)}",
             "Large clock: ${onOff(prefs.bigClock)}",
-            "Remote shortcuts…"
+            "Remote shortcuts…",
+            "Keep Wi-Fi awake in standby: ${onOff(prefs.keepAwake)}"
         )
         AlertDialog.Builder(this)
             .setTitle("Options")
@@ -294,6 +295,11 @@ class LauncherActivity : AppCompatActivity() {
                     9 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showOptions() }
                     10 -> { prefs.bigClock = !prefs.bigClock; updateClock(); showOptions() }
                     11 -> shortcutsManager()
+                    12 -> {
+                        prefs.keepAwake = !prefs.keepAwake
+                        if (prefs.keepAwake) KeepAliveService.start(this) else KeepAliveService.stop(this)
+                        showOptions()
+                    }
                 }
             }
             .show()

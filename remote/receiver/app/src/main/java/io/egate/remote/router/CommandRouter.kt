@@ -13,12 +13,12 @@ interface Session {
 
 interface Credentials {
     val token: String
-    val pairingPin: String?
     fun matches(candidate: String): Boolean
-    /** Called on every wrong PIN; implementations invalidate the PIN after a few failures. */
-    fun onPairFailed()
-    /** Called after a successful pair; the PIN is single-use. */
-    fun onPaired()
+    /**
+     * Atomically checks [code] against the active pairing PIN. On success the PIN is consumed;
+     * after a few failures it is invalidated. Returns true when the caller may be authenticated.
+     */
+    fun tryPair(code: String): Boolean
 }
 
 interface AppsProvider {
@@ -73,18 +73,11 @@ class CommandRouter(
                     session.send(Codec.encodeEvent(Event.AuthOk(deviceName, version)))
                     return
                 } else fail(Event.AuthFail)
-                is Command.Pair -> {
-                    val pin = creds.pairingPin
-                    if (pin != null && cmd.code == pin) {
-                        authenticated = true
-                        creds.onPaired()
-                        session.send(Codec.encodeEvent(Event.PairOk(creds.token, deviceName)))
-                        return
-                    } else {
-                        creds.onPairFailed()
-                        fail(Event.PairFail)
-                    }
-                }
+                is Command.Pair -> if (creds.tryPair(cmd.code)) {
+                    authenticated = true
+                    session.send(Codec.encodeEvent(Event.PairOk(creds.token, deviceName)))
+                    return
+                } else fail(Event.PairFail)
                 else -> fail(Event.AuthFail)
             }
         }

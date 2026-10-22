@@ -22,11 +22,15 @@ private class FakeApps : AppsProvider {
 }
 
 private class FakeCredentials(override val token: String = "TOKEN") : Credentials {
-    override var pairingPin: String? = null
+    var pairingPin: String? = null
     var pairFailures = 0
     override fun matches(candidate: String): Boolean = candidate == token
-    override fun onPairFailed() { if (++pairFailures >= 5) pairingPin = null }
-    override fun onPaired() { pairingPin = null }
+    override fun tryPair(code: String): Boolean {
+        val pin = pairingPin ?: return false
+        if (code == pin) { pairingPin = null; return true }
+        if (++pairFailures >= 5) pairingPin = null
+        return false
+    }
 }
 
 class CommandRouterTest {
