@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Remote App</string>
+	<string>EGate Remote</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -65,6 +65,16 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Scans the pairing code shown on the projector.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Controls the projector over Bluetooth when Wi-Fi is unavailable.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Finds and controls the projector on your Wi-Fi.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_egate-remote._tcp</string>
 	</array>
 </dict>
 </plist>
