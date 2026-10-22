@@ -1,11 +1,86 @@
 package io.egate.remote
 
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import org.json.JSONObject
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
+/** Full-screen pairing page: QR with the long token, plus a short-lived 6-digit PIN. */
 class PairingActivity : AppCompatActivity() {
+
+    private lateinit var store: PairingStore
+    private lateinit var qr: ImageView
+    private lateinit var pin: TextView
+    private lateinit var ip: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_pairing)
         RemoteService.start(this)
+        store = PairingStore(this)
+        qr = findViewById(R.id.qr)
+        pin = findViewById(R.id.pin)
+        ip = findViewById(R.id.ip)
+        findViewById<Button>(R.id.repair).setOnClickListener {
+            store.regenerate()
+            render()
+        }
+        findViewById<Button>(R.id.repair).requestFocus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        RemoteService.pairingStore = store
+        store.newPin()
+        render()
+    }
+
+    override fun onPause() {
+        store.pairingPin = null
+        super.onPause()
+    }
+
+    private fun render() {
+        val address = wifiIp()
+        val payload = JSONObject()
+            .put("v", 1)
+            .put("name", io.egate.remote.transport.WsServer.SERVICE_NAME)
+            .put("ip", address ?: "")
+            .put("port", 7272)
+            .put("token", store.token)
+            .toString()
+        qr.setImageBitmap(encodeQr(payload, 420))
+        pin.text = store.pairingPin?.let { it.substring(0, 3) + " " + it.substring(3) } ?: ""
+        ip.text = address ?: "no Wi-Fi"
+    }
+
+    private fun wifiIp(): String? {
+        val wm = applicationContext.getSystemService(WIFI_SERVICE) as? WifiManager
+        @Suppress("DEPRECATION")
+        val raw = wm?.connectionInfo?.ipAddress ?: 0
+        if (raw != 0) {
+            return "%d.%d.%d.%d".format(raw and 0xff, raw shr 8 and 0xff, raw shr 16 and 0xff, raw shr 24 and 0xff)
+        }
+        return NetworkInterface.getNetworkInterfaces()?.toList()
+            ?.flatMap { it.inetAddresses.toList() }
+            ?.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
+            ?.hostAddress
+    }
+
+    private fun encodeQr(text: String, size: Int): Bitmap {
+        val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 1))
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+        for (x in 0 until size) for (y in 0 until size) bmp.setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
+        return bmp
     }
 }

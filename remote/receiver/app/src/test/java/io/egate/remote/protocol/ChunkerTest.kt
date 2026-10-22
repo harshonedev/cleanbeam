@@ -70,3 +70,18 @@ class ChunkerTest {
         assertEquals((0 until 20).map { "{\"t\":\"key\",\"code\":$it}" }, out)
     }
 }
+
+class ChunkerLimitTest {
+    @Test
+    fun `assembler drops messages over the size limit`() {
+        val a = Chunker.Assembler(maxMessage = 100)
+        val big = ByteArray(150)
+        val chunks = Chunker.split(big, 23)
+        var result: ByteArray? = null
+        for (c in chunks) result = a.feed(c)
+        assertNull(result)
+        // and it recovers for a small message afterwards
+        val small = "{\"t\":\"ping\"}".toByteArray()
+        assertArrayEquals(small, a.feed(Chunker.split(small, 23)[0]))
+    }
+}

@@ -7,7 +7,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.StateListDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -17,6 +21,8 @@ import android.os.Looper
 import android.os.StatFs
 import android.provider.Settings
 import android.util.TypedValue
+import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
@@ -25,6 +31,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -43,7 +50,7 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var favAdapter: AppAdapter
 
     private var allApps: List<AppInfo> = emptyList()
-    private var lastHour = -1
+    private var bgKey: String = ""
 
     private val handler = Handler(Looper.getMainLooper())
     private val dateFmt = SimpleDateFormat("EEEE, d MMM", Locale.getDefault())
@@ -87,7 +94,7 @@ class LauncherActivity : AppCompatActivity() {
         grid.adapter = gridAdapter
         grid.setHasFixedSize(true)
 
-        applySky(force = true)
+        applyBackground(force = true)
         reloadApps()
     }
 
@@ -114,7 +121,20 @@ class LauncherActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) { super.onNewIntent(intent); grid.scrollToPosition(0) }
     override fun onBackPressed() { /* home: swallow */ }
 
-    // ---------- clock / greeting / stats / sky ----------
+    // ---------- remote shortcuts ----------
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (event != null && event.repeatCount == 0) {
+            val pkg = prefs.shortcuts()[keyCode]
+            if (pkg != null) {
+                AppRepository.launchIntentFor(this, pkg)?.let {
+                    it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); safeStart(it); return true
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    // ---------- clock / greeting / stats / background ----------
     private fun updateClock() {
         val now = Date()
         val pattern = buildString {
@@ -132,14 +152,31 @@ class LauncherActivity : AppCompatActivity() {
         if (prefs.showStats) { stats.visibility = View.VISIBLE; stats.text = statsLine() }
         else stats.visibility = View.GONE
 
-        applySky(force = false)
+        applyBackground(force = false)
     }
 
-    private fun applySky(force: Boolean) {
-        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        if (!force && hour == lastHour) return
-        lastHour = hour
-        root.background = Sky.drawable(prefs.ambientSky)
+    private fun applyBackground(force: Boolean) {
+        val imgs = if (prefs.wallpaper) Wallpaper.images(this) else emptyList()
+        val key: String
+        val bg: Drawable
+        if (imgs.isNotEmpty()) {
+            val idx = ((System.currentTimeMillis() / (30 * 60 * 1000)) % imgs.size).toInt()
+            key = "wp:${imgs[idx].path}:${prefs.wallpaperDim}"
+            if (!force && key == bgKey) return
+            val bmp = Wallpaper.load(imgs[idx].path, 1280, 720)
+            bg = if (bmp != null) {
+                val pic = BitmapDrawable(resources, bmp).apply { gravity = Gravity.FILL }
+                val dim = ColorDrawable(Color.argb((prefs.wallpaperDim * 255 / 100), 0, 0, 0))
+                LayerDrawable(arrayOf(pic, dim))
+            } else Sky.drawable(prefs.ambientSky)
+        } else {
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            key = "sky:$hour:${prefs.ambientSky}"
+            if (!force && key == bgKey) return
+            bg = Sky.drawable(prefs.ambientSky)
+        }
+        bgKey = key
+        root.background = bg
     }
 
     private fun statsLine(): String {
@@ -185,6 +222,7 @@ class LauncherActivity : AppCompatActivity() {
         } else {
             actions += "Pin to Favorites" to { prefs.toggleFavorite(app.packageName); reloadFavorites() }
         }
+        actions += "Assign remote button" to { captureShortcut(app) }
         actions += "App info" to {
             safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                 .setData(Uri.parse("package:${app.packageName}")))
@@ -195,19 +233,50 @@ class LauncherActivity : AppCompatActivity() {
             .show()
     }
 
+    // ---------- remote shortcut capture ----------
+    private val reservedKeys = setOf(
+        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+        KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_HOME
+    )
+
+    private fun captureShortcut(app: AppInfo) {
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Assign button to ${app.label}")
+            .setMessage("Press the remote button to use as a shortcut.\n(Direction, OK, Back and Home can't be used.)")
+            .setNegativeButton("Cancel", null)
+            .create()
+        dlg.setOnKeyListener { d, keyCode, event ->
+            if (event.action == KeyEvent.ACTION_DOWN && keyCode !in reservedKeys) {
+                prefs.setShortcut(keyCode, app.packageName)
+                d.dismiss()
+                toast("${keyName(keyCode)} -> ${app.label}")
+                true
+            } else false
+        }
+        dlg.show()
+    }
+
+    private fun keyName(code: Int): String {
+        val n = KeyEvent.keyCodeToString(code)
+        return n.removePrefix("KEYCODE_").replace('_', ' ')
+    }
+
     // ---------- options ----------
     private fun showOptions() {
         val labels = arrayOf(
             "Accent color: ${Prefs.ACCENTS[prefs.accentIndex].name}",
             "Grid columns: ${prefs.columns}",
             "Per-app color glow: ${onOff(prefs.appGlow)}",
+            "Wallpaper: ${onOff(prefs.wallpaper)}",
             "Ambient sky background: ${onOff(prefs.ambientSky)}",
             "Greeting: ${onOff(prefs.greeting)}",
             "System stats line: ${onOff(prefs.showStats)}",
             "App names: ${if (prefs.namesFocusedOnly) "Focused only" else "Always"}",
             "24-hour clock: ${onOff(prefs.clock24h)}",
             "Show seconds: ${onOff(prefs.showSeconds)}",
-            "Large clock: ${onOff(prefs.bigClock)}"
+            "Large clock: ${onOff(prefs.bigClock)}",
+            "Remote shortcuts…"
         )
         AlertDialog.Builder(this)
             .setTitle("Options")
@@ -216,13 +285,15 @@ class LauncherActivity : AppCompatActivity() {
                     0 -> pickAccent()
                     1 -> pickColumns()
                     2 -> { prefs.appGlow = !prefs.appGlow; applyStyle(); showOptions() }
-                    3 -> { prefs.ambientSky = !prefs.ambientSky; applySky(true); showOptions() }
-                    4 -> { prefs.greeting = !prefs.greeting; updateClock(); showOptions() }
-                    5 -> { prefs.showStats = !prefs.showStats; updateClock(); showOptions() }
-                    6 -> { prefs.namesFocusedOnly = !prefs.namesFocusedOnly; applyStyle(); showOptions() }
-                    7 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showOptions() }
-                    8 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showOptions() }
-                    9 -> { prefs.bigClock = !prefs.bigClock; updateClock(); showOptions() }
+                    3 -> wallpaperMenu()
+                    4 -> { prefs.ambientSky = !prefs.ambientSky; applyBackground(true); showOptions() }
+                    5 -> { prefs.greeting = !prefs.greeting; updateClock(); showOptions() }
+                    6 -> { prefs.showStats = !prefs.showStats; updateClock(); showOptions() }
+                    7 -> { prefs.namesFocusedOnly = !prefs.namesFocusedOnly; applyStyle(); showOptions() }
+                    8 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showOptions() }
+                    9 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showOptions() }
+                    10 -> { prefs.bigClock = !prefs.bigClock; updateClock(); showOptions() }
+                    11 -> shortcutsManager()
                 }
             }
             .show()
@@ -244,6 +315,64 @@ class LauncherActivity : AppCompatActivity() {
                 (grid.layoutManager as GridLayoutManager).spanCount = prefs.columns
                 gridAdapter.notifyDataSetChanged(); d.dismiss(); showOptions()
             }.show()
+    }
+
+    private fun wallpaperMenu() {
+        val imgs = Wallpaper.images(this)
+        val dir = Wallpaper.dir(this).absolutePath
+        val labels = arrayOf(
+            "Wallpaper: ${onOff(prefs.wallpaper)}",
+            "Dim: ${prefs.wallpaperDim}%",
+            "Images found: ${imgs.size}"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Wallpaper")
+            .setItems(labels) { _, i ->
+                when (i) {
+                    0 -> {
+                        prefs.wallpaper = !prefs.wallpaper
+                        if (prefs.wallpaper && imgs.isEmpty())
+                            toast("Add images to: $dir")
+                        applyBackground(true); wallpaperMenu()
+                    }
+                    1 -> pickDim()
+                    2 -> toast("adb push pic.jpg $dir/")
+                }
+            }
+            .show()
+    }
+
+    private fun pickDim() {
+        val opts = intArrayOf(0, 20, 40, 60, 80)
+        val labels = opts.map { "$it%" }.toTypedArray()
+        val cur = opts.indexOf(prefs.wallpaperDim).coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle("Wallpaper dim")
+            .setSingleChoiceItems(labels, cur) { d, i ->
+                prefs.wallpaperDim = opts[i]; applyBackground(true); d.dismiss(); wallpaperMenu()
+            }.show()
+    }
+
+    private fun shortcutsManager() {
+        val map = prefs.shortcuts()
+        val byPkg = allApps.associateBy { it.packageName }
+        if (map.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Remote shortcuts")
+                .setMessage("None yet. Long-press an app and choose \"Assign remote button\" to add one.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        val entries = map.entries.toList()
+        val labels = entries.map { "${keyName(it.key)}  ->  ${byPkg[it.value]?.label ?: it.value}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Remote shortcuts (select to remove)")
+            .setItems(labels) { _, i ->
+                val e = entries[i]
+                prefs.removeShortcut(e.key)
+                toast("Removed ${keyName(e.key)}")
+            }
+            .setPositiveButton("Close", null)
+            .show()
     }
 
     private fun applyStyle() {

@@ -11,6 +11,7 @@ object Chunker {
     private const val SEQ_MASK = 0x7F
     private const val ATT_OVERHEAD = 3
     private const val HEADER = 1
+    const val DEFAULT_MAX_MESSAGE = 64 * 1024
 
     fun payloadSize(mtu: Int): Int = (mtu - ATT_OVERHEAD - HEADER).coerceAtLeast(1)
 
@@ -32,7 +33,8 @@ object Chunker {
         return chunks
     }
 
-    class Assembler {
+    /** Messages larger than [maxMessage] bytes are dropped (a BLE peer could otherwise exhaust memory). */
+    class Assembler(private val maxMessage: Int = DEFAULT_MAX_MESSAGE) {
         private val buf = ByteArrayOutputStream()
         private var expected = 0
         private var open = false
@@ -48,6 +50,10 @@ object Chunker {
                 buf.reset(); open = false; expected = 0
                 if (seq != 0) return null
                 open = true
+            }
+            if (buf.size() + chunk.size - 1 > maxMessage) {
+                buf.reset(); open = false; expected = 0
+                return null
             }
             buf.write(chunk, 1, chunk.size - 1)
             expected = (seq + 1) and SEQ_MASK
