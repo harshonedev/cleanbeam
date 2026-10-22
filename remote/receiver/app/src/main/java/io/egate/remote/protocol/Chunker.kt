@@ -13,7 +13,10 @@ object Chunker {
     private const val HEADER = 1
     const val DEFAULT_MAX_MESSAGE = 64 * 1024
 
-    fun payloadSize(mtu: Int): Int = (mtu - ATT_OVERHEAD - HEADER).coerceAtLeast(1)
+    /** ATT caps an attribute value at 512 bytes whatever the MTU; the Amlogic stack aborts past it. */
+    const val MAX_ATTR_VALUE = 512
+
+    fun payloadSize(mtu: Int): Int = (minOf(mtu - ATT_OVERHEAD, MAX_ATTR_VALUE) - HEADER).coerceAtLeast(1)
 
     fun split(msg: ByteArray, mtu: Int): List<ByteArray> {
         val size = payloadSize(mtu)

@@ -101,6 +101,14 @@ class Prefs(context: Context) {
         val m = shortcuts(); m.remove(keyCode); saveShortcuts(m)
     }
 
+    var tmdbToken: String
+        get() = sp.getString("tmdb_token", "") ?: ""
+        set(v) = sp.edit().putString("tmdb_token", v.trim()).apply()
+
+    var region: String
+        get() = sp.getString("region", "") ?: ""
+        set(v) = sp.edit().putString("region", v.trim().uppercase()).apply()
+
     var keepAwake: Boolean
         get() = sp.getBoolean("keep_awake", false)
         set(v) = sp.edit().putBoolean("keep_awake", v).apply()

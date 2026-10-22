@@ -22,11 +22,13 @@ import android.os.Handler
 import android.os.Looper
 import android.os.StatFs
 import android.provider.Settings
+import android.text.InputType
 import android.text.format.DateUtils
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.animation.PathInterpolator
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -39,13 +41,14 @@ import java.util.concurrent.Executors
 
 class LauncherActivity : AppCompatActivity() {
 
-    private enum class Tab { APPS, FAVORITES }
+    private enum class Tab { HOME, APPS, FAVORITES }
 
     private lateinit var prefs: Prefs
     private lateinit var root: View
     private lateinit var bgA: ImageView
     private lateinit var bgB: ImageView
     private lateinit var tint: View
+    private lateinit var tabHome: TextView
     private lateinit var tabApps: TextView
     private lateinit var tabFavorites: TextView
     private lateinit var tabSettings: TextView
@@ -56,26 +59,39 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var heroTitle: TextView
     private lateinit var heroSubtitle: TextView
     private lateinit var heroMeta: TextView
+    private lateinit var heroBody: TextView
     private lateinit var row: FocusRowRecyclerView
+    private lateinit var shelves: ShelvesRecyclerView
     private lateinit var empty: View
+    private lateinit var emptyTitle: TextView
+    private lateinit var emptyHint: TextView
     private lateinit var stats: TextView
     private lateinit var adapter: AppAdapter
+    private lateinit var shelvesAdapter: HomeRowsAdapter
 
     private var allApps: List<AppInfo> = emptyList()
+    private var homeRows: List<HomeRow> = emptyList()
+    private var homeLoadedAt = 0L
+    private var homeLoading = false
     private var tab = Tab.APPS
-    private var heroApp: AppInfo? = null
-    private var bgFront = false          // which bg layer is currently visible: false = A, true = B
+    private var heroItem: Any? = null          // AppInfo or Pair<Title, HomeRow>
+    private var bgFront = false                // which bg layer is visible: false = A, true = B
     private var tintColor = 0
     private var tintAnim: ValueAnimator? = null
     private var tintDrawable = GradientDrawable()
     private var wallpaperKey = ""
     private var firstLoad = true
-    private var heroGen = 0              // bumps per hero change so a cancelled fade can't leave it hidden
+    private var heroGen = 0                    // bumps per hero change so a cancelled fade can't leave it hidden
 
     private val io = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
     private val ease = PathInterpolator(0.2f, 0f, 0f, 1f)
-    private val heroRunnable = Runnable { heroApp?.let { renderHero(it, animate = true) } }
+    private val heroRunnable = Runnable {
+        when (val it = heroItem) {
+            is AppInfo -> renderAppHero(it, animate = true)
+            is Pair<*, *> -> renderTitleHero(it.first as Title, it.second as HomeRow)
+        }
+    }
 
     private val tick = object : Runnable {
         override fun run() { updateClock(); handler.postDelayed(this, 1_000) }
@@ -87,6 +103,8 @@ class LauncherActivity : AppCompatActivity() {
         override fun onReceive(c: Context?, i: Intent?) = reloadApps()
     }
 
+    private val region: String get() = prefs.region.ifBlank { Tmdb.defaultRegion() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
@@ -96,6 +114,7 @@ class LauncherActivity : AppCompatActivity() {
         bgA = findViewById(R.id.bg_a)
         bgB = findViewById(R.id.bg_b)
         tint = findViewById(R.id.tint)
+        tabHome = findViewById(R.id.tab_home)
         tabApps = findViewById(R.id.tab_apps)
         tabFavorites = findViewById(R.id.tab_favorites)
         tabSettings = findViewById(R.id.tab_settings)
@@ -106,13 +125,18 @@ class LauncherActivity : AppCompatActivity() {
         heroTitle = findViewById(R.id.hero_title)
         heroSubtitle = findViewById(R.id.hero_subtitle)
         heroMeta = findViewById(R.id.hero_meta)
+        heroBody = findViewById(R.id.hero_body)
         row = findViewById(R.id.row)
+        shelves = findViewById(R.id.shelves)
         empty = findViewById(R.id.empty)
+        emptyTitle = findViewById(R.id.empty_title)
+        emptyHint = findViewById(R.id.empty_hint)
         stats = findViewById(R.id.stats)
 
         tint.background = tintDrawable
         root.background = Sky.drawable(prefs.ambientSky)
 
+        setupTab(tabHome) { selectTab(Tab.HOME) }
         setupTab(tabApps) { selectTab(Tab.APPS) }
         setupTab(tabFavorites) { selectTab(Tab.FAVORITES) }
         setupTab(tabSettings, selectOnFocus = false) { showOptions() }
@@ -125,10 +149,20 @@ class LauncherActivity : AppCompatActivity() {
         row.adapter = adapter
         row.itemAnimator = null
 
-        heroTitle.text = getString(R.string.loading)
+        shelvesAdapter = HomeRowsAdapter(
+            onClick = { t, r -> openTitle(t, r) },
+            onLongClick = { t, r -> titleMenu(t, r) },
+            onFocus = { t, r -> onCardFocused(t to r) })
+        shelvesAdapter.upTarget = tabHome
+        shelves.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+        shelves.adapter = shelvesAdapter
+        shelves.itemAnimator = null
+
+        tab = if (Tmdb.configured(this)) Tab.HOME else Tab.APPS
+        row.upTarget = currentTabView()
+        heroTitle.text = getString(if (tab == Tab.HOME) R.string.home_loading else R.string.loading)
         heroSubtitle.text = ""; heroMeta.visibility = View.GONE
-        row.upTarget = tabApps
-        underline.post { moveUnderline(tabApps, animate = false) }
+        underline.post { moveUnderline(currentTabView(), animate = false); paintTabs() }
 
         reloadApps()
         if (prefs.keepAwake) KeepAliveService.start(this)
@@ -173,8 +207,8 @@ class LauncherActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        row.scrollToPosition(0)
-        row.post { row.getChildAt(0)?.findViewById<View>(R.id.card)?.requestFocus() }
+        if (tab == Tab.HOME) { shelves.scrollToPosition(0); focusFirstShelfCard() }
+        else { row.scrollToPosition(0); row.post { firstCard(row)?.requestFocus() } }
     }
 
     override fun onBackPressed() { /* home: swallow */ }
@@ -196,10 +230,9 @@ class LauncherActivity : AppCompatActivity() {
     private fun setupTab(v: TextView, selectOnFocus: Boolean = true, onSelect: () -> Unit) {
         v.setOnClickListener { onSelect() }
         v.setOnFocusChangeListener { view, hasFocus ->
-            (view as TextView).animate().alpha(1f).setDuration(150).start()
             if (hasFocus) {
                 moveUnderline(view, animate = true)
-                if (selectOnFocus) onSelect()
+                if (selectOnFocus) onSelect() else paintTabs()
             } else {
                 paintTabs()
                 moveUnderline(currentTabView(), animate = true)
@@ -207,10 +240,12 @@ class LauncherActivity : AppCompatActivity() {
         }
     }
 
-    private fun currentTabView(): TextView = if (tab == Tab.APPS) tabApps else tabFavorites
+    private fun currentTabView(): TextView = when (tab) {
+        Tab.HOME -> tabHome; Tab.APPS -> tabApps; Tab.FAVORITES -> tabFavorites
+    }
 
     private fun paintTabs() {
-        for (t in listOf(tabApps, tabFavorites, tabSettings)) {
+        for (t in listOf(tabHome, tabApps, tabFavorites, tabSettings)) {
             val active = t === currentTabView() || t.hasFocus()
             t.setTextColor(getColor(if (active) R.color.text_primary else R.color.text_secondary))
         }
@@ -239,7 +274,7 @@ class LauncherActivity : AppCompatActivity() {
         tab = t
         row.upTarget = currentTabView()
         paintTabs()
-        populateRow(animate = true)
+        populate(animate = true)
     }
 
     // ---------- clock / status / background ----------
@@ -265,11 +300,11 @@ class LauncherActivity : AppCompatActivity() {
         return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
-    /** Wallpaper mode replaces per-app art with a user image; otherwise the focused app paints the room. */
+    /** Wallpaper mode replaces per-item art with a user image; otherwise the focused item paints the room. */
     private fun applyWallpaper() {
         val imgs = if (prefs.wallpaper) Wallpaper.images(this) else emptyList()
         if (imgs.isEmpty()) {
-            if (wallpaperKey.isNotEmpty()) { wallpaperKey = ""; heroApp?.let { crossfadeArt(ambientFor(it)) } }
+            if (wallpaperKey.isNotEmpty()) { wallpaperKey = ""; handler.post(heroRunnable) }
             return
         }
         val idx = ((System.currentTimeMillis() / (30 * 60 * 1000)) % imgs.size).toInt()
@@ -339,54 +374,136 @@ class LauncherActivity : AppCompatActivity() {
             Log.i("EGate", "loaded ${apps.size} apps in ${System.currentTimeMillis() - t0}ms")
             handler.post {
                 allApps = apps
-                populateRow(animate = firstLoad)
+                populate(animate = firstLoad)
                 firstLoad = false
             }
         }
     }
 
     private fun visibleApps(): List<AppInfo> = when (tab) {
-        Tab.APPS -> allApps
         Tab.FAVORITES -> {
             val byPkg = allApps.associateBy { it.packageName }
             prefs.favorites().mapNotNull { byPkg[it] }
         }
+        else -> allApps
+    }
+
+    private fun populate(animate: Boolean) {
+        if (tab == Tab.HOME) populateHome() else populateRow(animate)
+    }
+
+    private fun showEmpty(title: Int, hint: Int) {
+        emptyTitle.text = getString(title); emptyHint.text = getString(hint)
+        empty.visibility = View.VISIBLE
+        heroItem = null
+        hero.animate().alpha(0f).setDuration(200).start()
+        crossfadeArt(null); animateTint(prefs.accentColor)
     }
 
     private fun populateRow(animate: Boolean) {
         val list = visibleApps()
+        shelves.visibility = View.GONE
         adapter.entrance = animate
         adapter.submit(list)
         row.scrollToPosition(0)
-        empty.visibility = if (list.isEmpty() && tab == Tab.FAVORITES) View.VISIBLE else View.GONE
         row.visibility = if (list.isEmpty()) View.INVISIBLE else View.VISIBLE
         if (animate) row.post { adapter.entrance = false }
 
-        val focused = currentFocus
-        val focusInRow = focused != null && row.findContainingItemView(focused) != null
         if (list.isEmpty()) {
-            heroApp = null
-            hero.animate().alpha(0f).setDuration(200).start()
-            crossfadeArt(null); animateTint(prefs.accentColor)
+            if (tab == Tab.FAVORITES) showEmpty(R.string.empty_favorites, R.string.empty_favorites_hint)
             return
         }
-        // Keep the hero on something: first card, and give it focus on first load / tab switch from the row.
-        if (focusInRow || heroApp == null || !list.contains(heroApp)) {
-            if (heroApp == null || currentFocus == null || focusInRow) {
-                row.post { row.getChildAt(0)?.findViewById<View>(R.id.card)?.requestFocus() }
-            }
-            if (!list.contains(heroApp)) onCardFocused(list[0])
+        empty.visibility = View.GONE
+        val focused = currentFocus
+        val focusInRow = focused != null && row.findContainingItemView(focused) != null
+        val cur = heroItem as? AppInfo
+        if (cur == null || !list.contains(cur) || focusInRow) {
+            if (focused == null || focusInRow || cur == null) row.post { firstCard(row)?.requestFocus() }
+            if (cur == null || !list.contains(cur)) onCardFocused(list[0])
         }
     }
 
-    private fun onCardFocused(app: AppInfo) {
-        if (heroApp === app) return
-        heroApp = app
+    // ---------- home (TMDB) ----------
+    private fun populateHome() {
+        row.visibility = View.GONE
+        if (!Tmdb.configured(this)) {
+            shelves.visibility = View.GONE
+            shelvesAdapter.submit(emptyList())
+            showEmpty(R.string.home_no_token, R.string.home_no_token_hint)
+            return
+        }
+        empty.visibility = View.GONE
+        shelves.visibility = View.VISIBLE
+        val stale = System.currentTimeMillis() - homeLoadedAt > Tmdb.ROWS_TTL
+        if (homeRows.isNotEmpty()) showShelves(homeRows)
+        else { heroTitle.text = getString(R.string.home_loading); heroSubtitle.text = ""; heroMeta.visibility = View.GONE; heroBody.visibility = View.GONE; hero.alpha = 1f }
+        if ((stale || homeRows.isEmpty()) && !homeLoading && allApps.isNotEmpty()) loadHome()
+    }
+
+    private fun loadHome() {
+        homeLoading = true
+        val apps = allApps
+        val reg = region
+        io.execute {
+            val rows = runCatching { Tmdb.rows(this, apps, reg) }
+                .onFailure { Log.e("EGate", "tmdb rows failed", it) }.getOrDefault(emptyList())
+            handler.post {
+                homeLoading = false
+                if (rows.isNotEmpty()) { homeRows = rows; homeLoadedAt = System.currentTimeMillis() }
+                if (tab != Tab.HOME) return@post
+                if (homeRows.isEmpty()) { shelves.visibility = View.GONE; showEmpty(R.string.home_empty, R.string.home_empty_hint) }
+                else if (rows.isNotEmpty()) showShelves(rows)
+            }
+        }
+    }
+
+    private fun showShelves(rows: List<HomeRow>) {
+        shelves.visibility = View.VISIBLE
+        empty.visibility = View.GONE
+        shelvesAdapter.submit(rows)
+        shelves.scrollToPosition(0)
+        val focused = currentFocus
+        val focusInTabs = focused != null && focused.parent === tabHome.parent
+        val cur = heroItem as? Pair<*, *>
+        if (cur == null || !rows.contains(cur.second)) {
+            onCardFocused(rows[0].titles[0] to rows[0])
+            if (!focusInTabs) focusFirstShelfCard()
+        }
+    }
+
+    private fun firstCard(rv: View?): View? =
+        (rv as? FocusRowRecyclerView)?.getChildAt(0)?.findViewById(R.id.card)
+
+    private fun focusFirstShelfCard() {
+        shelves.post {
+            val inner = shelves.getChildAt(0)?.findViewById<FocusRowRecyclerView>(R.id.row_titles)
+            val card = firstCard(inner)
+            if (card != null) card.requestFocus()
+            else inner?.post { firstCard(inner)?.requestFocus() }
+        }
+    }
+
+    private fun onCardFocused(item: Any) {
+        if (heroItem == item) return
+        heroItem = item
         handler.removeCallbacks(heroRunnable)
         handler.postDelayed(heroRunnable, 90)
     }
 
-    private fun renderHero(app: AppInfo, animate: Boolean) {
+    // ---------- hero ----------
+    private fun swapHero(animate: Boolean, apply: () -> Unit) {
+        val gen = ++heroGen
+        if (!animate) { apply(); hero.alpha = 1f; hero.translationY = 0f; return }
+        hero.animate().cancel()
+        hero.animate().alpha(0f).translationY(6f).setDuration(110).withEndAction {
+            if (gen != heroGen) return@withEndAction
+            apply()
+            hero.translationY = 14f
+            hero.animate().alpha(1f).translationY(0f).setDuration(320).setInterpolator(ease).start()
+        }.start()
+    }
+
+    private fun renderAppHero(app: AppInfo, animate: Boolean) {
         val subtitle = listOfNotNull(
             app.category?.let { "$it app" },
             shortVersion(app.version)?.let { "version $it" }
@@ -401,25 +518,39 @@ class LauncherActivity : AppCompatActivity() {
             app.installTime > 0 -> "Installed " + relative(app.installTime, DateUtils.DAY_IN_MILLIS)
             else -> ""
         }
-        val apply = {
+        swapHero(animate) {
             heroTitle.text = app.label
             heroSubtitle.text = subtitle
             heroMeta.text = meta
             heroMeta.visibility = if (meta.isEmpty()) View.GONE else View.VISIBLE
-        }
-        val gen = ++heroGen
-        if (!animate) { apply(); hero.alpha = 1f; hero.translationY = 0f }
-        else {
-            hero.animate().cancel()
-            hero.animate().alpha(0f).translationY(6f).setDuration(110).withEndAction {
-                if (gen != heroGen) return@withEndAction
-                apply()
-                hero.translationY = 14f
-                hero.animate().alpha(1f).translationY(0f).setDuration(320).setInterpolator(ease).start()
-            }.start()
+            heroBody.visibility = View.GONE
         }
         if (wallpaperKey.isEmpty()) crossfadeArt(ambientFor(app))
         animateTint(if (prefs.appGlow) app.color else prefs.accentColor)
+    }
+
+    private fun renderTitleHero(t: Title, r: HomeRow) {
+        val subtitle = listOfNotNull(
+            if (t.kind == "tv") "Series" else "Film",
+            t.year,
+            if (t.rating > 0) String.format(Locale.US, "%.1f on TMDB", t.rating) else null
+        ).joinToString(", ")
+        val meta = r.providerName?.let { "On $it" } ?: ""
+        swapHero(animate = true) {
+            heroTitle.text = t.name
+            heroSubtitle.text = subtitle
+            heroMeta.text = meta
+            heroMeta.visibility = if (meta.isEmpty()) View.GONE else View.VISIBLE
+            heroBody.text = t.overview
+            heroBody.visibility = if (t.overview.isBlank()) View.GONE else View.VISIBLE
+        }
+        val url = Tmdb.imageUrl(t.backdrop, "w780") ?: return
+        if (wallpaperKey.isNotEmpty() && !prefs.appGlow) return
+        ImageLoader.fetch(this, url, 800, { bmp -> bmp to AppRepository.colorOf(bmp) }) { res ->
+            if (res == null || (heroItem as? Pair<*, *>)?.first != t) return@fetch
+            if (wallpaperKey.isEmpty()) crossfadeArt(BitmapDrawable(resources, res.first).apply { alpha = 0x99 })
+            animateTint(if (prefs.appGlow) res.second else prefs.accentColor)
+        }
     }
 
     /** "2 hours ago" / "yesterday" read mid-sentence; a date like "May 26" keeps its capital. */
@@ -436,14 +567,51 @@ class LauncherActivity : AppCompatActivity() {
         return (if (core.length >= 3) core else v.trim()).take(24)
     }
 
-    private fun launchApp(app: AppInfo) {
-        val intent = AppRepository.launchIntentFor(this, app.packageName)
-        if (intent == null) { toast("Can't open ${app.label}"); return }
+    // ---------- launching ----------
+    private fun launchApp(app: AppInfo) = launchPackage(app.packageName, app.label)
+
+    private fun launchPackage(pkg: String, label: String) {
+        val intent = AppRepository.launchIntentFor(this, pkg)
+        if (intent == null) { toast("Can't open $label"); return }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         safeStart(intent)
     }
 
-    // ---------- long-press menu ----------
+    /** OK on a title: open the shelf's app, or look up which installed app carries it. */
+    private fun openTitle(t: Title, r: HomeRow) {
+        if (r.providerPkg != null) { launchPackage(r.providerPkg, r.providerName ?: r.header); return }
+        val apps = allApps; val reg = region
+        io.execute {
+            val names = Tmdb.providersFor(this, t, reg)
+            val installed = Tmdb.matchProviders(apps, Tmdb.providers(this, reg))
+            val hit = installed.firstOrNull { (_, p) -> p.name in names }
+            handler.post {
+                when {
+                    hit != null -> launchPackage(hit.first.packageName, hit.first.label)
+                    names.isEmpty() -> toast("${t.name} isn't streaming in $reg right now")
+                    else -> toast("${t.name} is on ${names.take(3).joinToString(", ")}, not installed here")
+                }
+            }
+        }
+    }
+
+    private fun titleMenu(t: Title, r: HomeRow) {
+        val apps = allApps; val reg = region
+        io.execute {
+            val names = Tmdb.providersFor(this, t, reg)
+            val installed = Tmdb.matchProviders(apps, Tmdb.providers(this, reg)).associateBy { it.second.name }
+            handler.post {
+                if (names.isEmpty()) { toast("${t.name} isn't streaming in $reg right now"); return@post }
+                val labels = names.map { n -> if (installed.containsKey(n)) "Open in $n" else "$n (not installed)" }
+                AlertDialog.Builder(this).setTitle(t.name)
+                    .setItems(labels.toTypedArray()) { _, i ->
+                        installed[names[i]]?.let { launchPackage(it.first.packageName, it.first.label) }
+                    }.show()
+            }
+        }
+    }
+
+    // ---------- long-press menu (apps) ----------
     private fun appMenu(app: AppInfo) {
         val fav = prefs.isFavorite(app.packageName)
         val actions = mutableListOf<Pair<String, () -> Unit>>()
@@ -498,9 +666,13 @@ class LauncherActivity : AppCompatActivity() {
 
     // ---------- options ----------
     private fun showOptions() {
+        val tokenState = if (Tmdb.configured(this)) "Set" else "Not set"
         val labels = arrayOf(
+            "TMDB access token: $tokenState",
+            "Region: $region",
+            "Refresh Home",
             "Accent color: ${Prefs.ACCENTS[prefs.accentIndex].name}",
-            "Tint room with app color: ${onOff(prefs.appGlow)}",
+            "Tint room with art color: ${onOff(prefs.appGlow)}",
             "Wallpaper: ${onOff(prefs.wallpaper)}",
             "Ambient sky background: ${onOff(prefs.ambientSky)}",
             "System stats line: ${onOff(prefs.showStats)}",
@@ -515,27 +687,61 @@ class LauncherActivity : AppCompatActivity() {
             .setTitle("Settings")
             .setItems(labels) { _, which ->
                 when (which) {
-                    0 -> pickAccent()
-                    1 -> { prefs.appGlow = !prefs.appGlow; retint(); showOptions() }
-                    2 -> wallpaperMenu()
-                    3 -> { prefs.ambientSky = !prefs.ambientSky; root.background = Sky.drawable(prefs.ambientSky); showOptions() }
-                    4 -> { prefs.showStats = !prefs.showStats; updateClock(); showOptions() }
-                    5 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showOptions() }
-                    6 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showOptions() }
-                    7 -> shortcutsManager()
-                    8 -> {
+                    0 -> enterToken()
+                    1 -> pickRegion()
+                    2 -> { Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0; if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME) }
+                    3 -> pickAccent()
+                    4 -> { prefs.appGlow = !prefs.appGlow; retint(); showOptions() }
+                    5 -> wallpaperMenu()
+                    6 -> { prefs.ambientSky = !prefs.ambientSky; root.background = Sky.drawable(prefs.ambientSky); showOptions() }
+                    7 -> { prefs.showStats = !prefs.showStats; updateClock(); showOptions() }
+                    8 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showOptions() }
+                    9 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showOptions() }
+                    10 -> shortcutsManager()
+                    11 -> {
                         prefs.keepAwake = !prefs.keepAwake
                         if (prefs.keepAwake) KeepAliveService.start(this) else KeepAliveService.stop(this)
                         showOptions()
                     }
-                    9 -> safeStart(Intent(Settings.ACTION_WIFI_SETTINGS))
-                    10 -> safeStart(Intent(Settings.ACTION_SETTINGS))
+                    12 -> safeStart(Intent(Settings.ACTION_WIFI_SETTINGS))
+                    13 -> safeStart(Intent(Settings.ACTION_SETTINGS))
                 }
             }
             .show()
     }
 
-    private fun retint() { tintColor = 0; heroApp?.let { animateTint(if (prefs.appGlow) it.color else prefs.accentColor) } }
+    private fun enterToken() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            hint = "v4 read access token or v3 API key"
+            setText(prefs.tmdbToken)
+            setSingleLine()
+        }
+        AlertDialog.Builder(this).setTitle("TMDB access token")
+            .setMessage("Free at themoviedb.org → Settings → API. Or push it to files/tmdb.key with adb.")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                prefs.tmdbToken = input.text.toString()
+                Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
+                if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun pickRegion() {
+        val codes = arrayOf("IN", "US", "GB", "CA", "AU", "DE", "FR", "ES", "IT", "BR", "MX", "JP", "KR", "SG", "AE")
+        val cur = codes.indexOf(region).coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle("Region for streaming availability")
+            .setSingleChoiceItems(codes, cur) { d, i ->
+                prefs.region = codes[i]
+                Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
+                d.dismiss()
+                if (tab == Tab.HOME) populateHome() else showOptions()
+            }.show()
+    }
+
+    private fun retint() { tintColor = 0; handler.post(heroRunnable) }
 
     private fun pickAccent() {
         val names = Prefs.ACCENTS.map { it.name }.toTypedArray()

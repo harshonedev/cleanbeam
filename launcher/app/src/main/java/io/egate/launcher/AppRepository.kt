@@ -86,6 +86,11 @@ object AppRepository {
 
     private fun dominantColor(d: Drawable): Int {
         val bmp = toBitmap(d) ?: return FALLBACK
+        return try { colorOf(bmp) } finally { if (bmp !== (d as? BitmapDrawable)?.bitmap) bmp.recycle() }
+    }
+
+    /** Lively tint for a bitmap: vibrant swatch, lifted if too dark, accent if too gray. */
+    fun colorOf(bmp: Bitmap): Int {
         return try {
             val p = Palette.from(bmp).clearFilters().generate()
             val c = p.getVibrantColor(0)
@@ -93,7 +98,6 @@ object AppRepository {
                 .takeIf { it != 0 } ?: p.getDominantColor(FALLBACK)
             boost(c)
         } catch (e: Exception) { FALLBACK }
-        finally { if (bmp !== (d as? BitmapDrawable)?.bitmap) bmp.recycle() }
     }
 
     // Keep tint colors lively: lift very dark/gray swatches toward a usable tone.

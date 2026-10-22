@@ -68,6 +68,13 @@ void main() {
     expect(out, List.generate(20, (i) => '{"t":"key","code":$i}'));
   });
 
+  test('chunks never exceed the 512-byte ATT attribute limit even at mtu 517', () {
+    final chunks = splitChunks(Uint8List(2000), 517);
+    expect(chunks.map((c) => c.length).reduce((a, b) => a > b ? a : b), 512);
+    expect(chunkPayloadSize(517), 511);
+    expect(chunkPayloadSize(23), 19);
+  });
+
   test('assembler drops messages over the size limit', () {
     final a = ChunkAssembler(maxMessage: 100);
     Uint8List? result;

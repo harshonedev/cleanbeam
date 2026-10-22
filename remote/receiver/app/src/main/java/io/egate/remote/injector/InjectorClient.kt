@@ -75,8 +75,7 @@ class InjectorClient(
             val spawner = object : Spawner {
                 override fun spawn() {
                     try {
-                        AdbClient().use {
-                            it.connect()
+                        AdbClient.connectAny().use {
                             // adbd kills the shell's children when the stream closes, so detach the
                             // helper into its own session; its stderr goes to a log for debugging.
                             val launch = "CLASSPATH=$apkPath exec app_process /system/bin io.egate.remote.injector.Main --uid $appUid"

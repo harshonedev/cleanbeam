@@ -57,7 +57,8 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent">
 
-            <TextView android:id="@+id/tab_apps" style="@style/Tab" android:text="@string/tab_apps" />
+            <TextView android:id="@+id/tab_home" style="@style/Tab" android:text="@string/tab_home" />
+            <TextView android:id="@+id/tab_apps" style="@style/Tab" android:layout_marginStart="18dp" android:text="@string/tab_apps" />
             <TextView android:id="@+id/tab_favorites" style="@style/Tab" android:layout_marginStart="18dp" android:text="@string/tab_favorites" />
             <TextView android:id="@+id/tab_settings" style="@style/Tab" android:layout_marginStart="18dp" android:text="@string/tab_settings" />
         </LinearLayout>
@@ -100,14 +101,22 @@
                 android:contentDescription="@null" />
         </LinearLayout>
 
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/shelf_top"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.56" />
+
         <!-- hero -->
         <LinearLayout
             android:id="@+id/hero"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="56dp"
+            android:layout_marginBottom="6dp"
             android:orientation="vertical"
-            app:layout_constraintBottom_toTopOf="@id/row"
+            app:layout_constraintBottom_toTopOf="@id/shelf_top"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0"
@@ -145,6 +154,20 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="15sp"
                 tools:text="Last opened 2 hours ago" />
+
+            <TextView
+                android:id="@+id/hero_body"
+                android:layout_width="wrap_content"
+                android:maxWidth="520dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:lineSpacingMultiplier="1.15"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:visibility="gone"
+                tools:text="A retired hitman is pulled back in." />
         </LinearLayout>
 
         <!-- app row -->
@@ -152,11 +175,22 @@
             android:id="@+id/row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="48dp"
             android:clipChildren="false"
             android:clipToPadding="false"
             android:paddingStart="47dp"
             android:paddingEnd="900dp"
+            app:layout_constraintTop_toTopOf="@id/shelf_top"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <io.egate.launcher.ShelvesRecyclerView
+            android:id="@+id/shelves"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:paddingBottom="400dp"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="@id/shelf_top"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
 

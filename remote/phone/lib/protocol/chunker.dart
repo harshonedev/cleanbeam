@@ -9,7 +9,13 @@ const _attOverhead = 3;
 const _header = 1;
 const defaultMaxMessage = 64 * 1024;
 
-int chunkPayloadSize(int mtu) => (mtu - _attOverhead - _header).clamp(1, 1 << 20);
+/// ATT caps an attribute value at 512 bytes whatever the MTU; the projector's stack aborts past it.
+const maxAttrValue = 512;
+
+int chunkPayloadSize(int mtu) {
+  final usable = mtu - _attOverhead;
+  return ((usable < maxAttrValue ? usable : maxAttrValue) - _header).clamp(1, 1 << 20);
+}
 
 List<Uint8List> splitChunks(Uint8List msg, int mtu) {
   final size = chunkPayloadSize(mtu);

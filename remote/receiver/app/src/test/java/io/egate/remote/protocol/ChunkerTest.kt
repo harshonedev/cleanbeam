@@ -85,3 +85,14 @@ class ChunkerLimitTest {
         assertArrayEquals(small, a.feed(Chunker.split(small, 23)[0]))
     }
 }
+
+class ChunkerAttLimitTest {
+    @Test
+    fun `chunks never exceed the 512-byte ATT attribute limit even at mtu 517`() {
+        val chunks = Chunker.split(ByteArray(2000), 517)
+        assertEquals(512, chunks.maxOf { it.size })
+        assertEquals(511, Chunker.payloadSize(517))
+        assertEquals(511, Chunker.payloadSize(1000))
+        assertEquals(19, Chunker.payloadSize(23))
+    }
+}

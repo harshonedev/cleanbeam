@@ -13,6 +13,21 @@ import java.net.Socket
  */
 class AdbClient(private val host: String = "127.0.0.1", private val port: Int = 3333) : Closeable {
 
+    companion object {
+        /** persist.adb.tcp.port is 3333, but `adb root` restarts adbd on the default 5555. */
+        val CANDIDATE_PORTS = listOf(3333, 5555)
+
+        /** Connects to the first local adbd port that answers. */
+        fun connectAny(): AdbClient {
+            var last: Exception? = null
+            for (p in CANDIDATE_PORTS) {
+                val c = AdbClient(port = p)
+                try { c.connect(); return c } catch (e: Exception) { last = e; c.close() }
+            }
+            throw IOException("no local adbd on ${CANDIDATE_PORTS}", last)
+        }
+    }
+
     private var socket: Socket? = null
     private lateinit var input: BufferedInputStream
     private lateinit var output: BufferedOutputStream

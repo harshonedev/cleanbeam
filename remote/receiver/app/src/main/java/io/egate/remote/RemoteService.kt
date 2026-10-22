@@ -71,7 +71,7 @@ class RemoteService : Service() {
                 val cmd = intent.getStringExtra("cmd") ?: "id"
                 executor.execute {
                     try {
-                        AdbClient().use { it.connect(); Log.i(TAG, "debug shell '$cmd' → " + it.shell(cmd).trim()) }
+                        AdbClient.connectAny().use { Log.i(TAG, "debug shell '$cmd' → " + it.shell(cmd).trim()) }
                     } catch (e: Exception) {
                         Log.e(TAG, "debug shell failed", e)
                     }
