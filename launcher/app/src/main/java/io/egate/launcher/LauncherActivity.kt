@@ -575,38 +575,54 @@ class LauncherActivity : AppCompatActivity() {
         safeStart(intent)
     }
 
-    /** OK on a title: open the shelf's app, or look up which installed app carries it. */
-    private fun openTitle(t: Title, r: HomeRow) {
-        if (r.providerPkg != null) { launchPackage(r.providerPkg, r.providerName ?: r.header); return }
-        val apps = allApps; val reg = region
-        io.execute {
-            val names = Tmdb.providersFor(this, t, reg)
-            val installed = Tmdb.matchProviders(apps, Tmdb.providers(this, reg))
-            val hit = installed.firstOrNull { (_, p) -> p.name in names }
-            handler.post {
-                when {
-                    hit != null -> launchPackage(hit.first.packageName, hit.first.label)
-                    names.isEmpty() -> toast("${t.name} isn't streaming in $reg right now")
-                    else -> toast("${t.name} is on ${names.take(3).joinToString(", ")}, not installed here")
-                }
-            }
+    /** One way to watch a title: an installed app to open, or a service to install. */
+    private class WatchOption(val service: Service, val app: AppInfo?)
+
+    /**
+     * OK on a title: find the services streaming it here, then play it in the one installed app,
+     * offer to install the one missing app, or ask when there is more than one choice.
+     */
+    private fun openTitle(t: Title, r: HomeRow) = watchOptions(t, r) { options ->
+        when (options.size) {
+            0 -> toast("${t.name} isn't streaming in $region right now")
+            1 -> watch(t, options[0])
+            else -> chooseWatchOption(t, options)
         }
     }
 
-    private fun titleMenu(t: Title, r: HomeRow) {
+    /** Long press on a title: always show the full list of services carrying it. */
+    private fun titleMenu(t: Title, r: HomeRow) = watchOptions(t, r) { options ->
+        if (options.isEmpty()) toast("${t.name} isn't streaming in $region right now")
+        else chooseWatchOption(t, options)
+    }
+
+    private fun watchOptions(t: Title, r: HomeRow, cb: (List<WatchOption>) -> Unit) {
         val apps = allApps; val reg = region
         io.execute {
-            val names = Tmdb.providersFor(this, t, reg)
-            val installed = Tmdb.matchProviders(apps, Tmdb.providers(this, reg)).associateBy { it.second.name }
-            handler.post {
-                if (names.isEmpty()) { toast("${t.name} isn't streaming in $reg right now"); return@post }
-                val labels = names.map { n -> if (installed.containsKey(n)) "Open in $n" else "$n (not installed)" }
-                AlertDialog.Builder(this).setTitle(t.name)
-                    .setItems(labels.toTypedArray()) { _, i ->
-                        installed[names[i]]?.let { launchPackage(it.first.packageName, it.first.label) }
-                    }.show()
+            val services = Services.forTmdbNames(Tmdb.providersFor(this, t, reg)).toMutableList()
+            val installed = Services.installed(apps)
+            // The shelf's own service goes first: that is where the user saw the title.
+            if (r.providerPkg != null) {
+                val shelf = services.firstOrNull { installed[it]?.packageName == r.providerPkg }
+                if (shelf != null) { services.remove(shelf); services.add(0, shelf) }
             }
+            val options = services.sortedByDescending { installed.containsKey(it) }.map { WatchOption(it, installed[it]) }
+            handler.post { cb(options) }
         }
+    }
+
+    private fun chooseWatchOption(t: Title, options: List<WatchOption>) {
+        val labels = options.map { o -> if (o.app != null) "Open in ${o.app.label}" else "Install ${o.service.name}" }
+        AlertDialog.Builder(this).setTitle(t.name)
+            .setItems(labels.toTypedArray()) { _, i -> watch(t, options[i]) }
+            .show()
+    }
+
+    private fun watch(t: Title, o: WatchOption) {
+        val intent = if (o.app != null) Playback.playIntent(this, o.app.packageName, o.service, t.name)
+                     else Playback.storeIntent(this, o.service.storePkg)
+        if (intent == null) { toast("Can't open ${o.service.name}"); return }
+        safeStart(intent)
     }
 
     // ---------- long-press menu (apps) ----------

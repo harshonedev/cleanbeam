@@ -27,36 +27,6 @@ object Tmdb {
     const val ROWS_TTL = 6 * HOUR
     private const val PROVIDERS_TTL = 7 * 24 * HOUR
 
-    /** package-name fragment -> TMDB provider names, tried in order. */
-    private val PKG_HINTS = listOf(
-        "netflix" to listOf("Netflix"),
-        "amazonvideo" to listOf("Amazon Prime Video"),
-        "primevideo" to listOf("Amazon Prime Video"),
-        "hotstar" to listOf("JioHotstar", "Hotstar", "Disney Plus Hotstar", "Disney Plus"),
-        "disney" to listOf("Disney Plus", "JioHotstar"),
-        "youtube" to listOf("YouTube"),
-        "ahaflix" to listOf("aha"),
-        "mxtech" to listOf("MX Player", "Amazon MX Player"),
-        "jiocinema" to listOf("JioCinema", "JioHotstar"),
-        "graymatrix" to listOf("Zee5"),
-        "zee5" to listOf("Zee5"),
-        "sonyliv" to listOf("Sony Liv"),
-        "apple" to listOf("Apple TV", "Apple TV Plus"),
-        "crunchyroll" to listOf("Crunchyroll"),
-        "mubi" to listOf("MUBI"),
-        "hoichoi" to listOf("Hoichoi"),
-        "sunnxt" to listOf("Sun Nxt"),
-        "erosnow" to listOf("Eros Now"),
-        "lionsgate" to listOf("Lionsgate Play"),
-        "discovery" to listOf("Discovery+"),
-        "hbomax" to listOf("HBO Max", "Max"),
-        "hulu" to listOf("Hulu"),
-        "peacock" to listOf("Peacock Premium", "Peacock"),
-        "paramount" to listOf("Paramount Plus"),
-        "viki" to listOf("Viki")
-    )
-    private val NOISE = setOf("video", "plus", "play", "tv", "app", "the", "for", "android", "premium", "channel", "store", "with", "ads", "free")
-
     class Provider(val id: Int, val name: String, val priority: Int)
 
     // ---------- config ----------
@@ -89,48 +59,32 @@ object Tmdb {
         return out.sortedBy { it.priority }
     }
 
-    /** Installed apps that map to a TMDB provider, most recently used first; one app per provider. */
-    fun matchProviders(apps: List<AppInfo>, providers: List<Provider>): List<Pair<AppInfo, Provider>> {
-        val byName = providers.associateBy { it.name.lowercase() }
-        val matched = LinkedHashMap<Int, Pair<AppInfo, Provider>>()
-        for (app in apps.sortedByDescending { it.lastUsed }) {
-            val p = matchOne(app, providers, byName) ?: continue
-            if (!matched.containsKey(p.id)) matched[p.id] = app to p
-        }
-        return matched.values.toList()
-    }
-
-    private fun matchOne(app: AppInfo, providers: List<Provider>, byName: Map<String, Provider>): Provider? {
-        val pkg = app.packageName.lowercase()
-        for ((frag, names) in PKG_HINTS) {
-            if (!pkg.contains(frag)) continue
-            for (n in names) byName[n.lowercase()]?.let { return it }
-        }
-        // Fallback: the label and the provider name collapse to the same word ("MX Player" / "mxplayer"),
-        // or one contains the other ("CLAP Netflix" / "Netflix"). Short names must match exactly.
-        val a = norm(app.label)
-        if (a.isEmpty()) return null
-        return providers.firstOrNull { p ->
-            val b = norm(p.name)
-            b.isNotEmpty() && (a == b || (b.length >= 4 && a.length >= 4 && (a.contains(b) || b.contains(a))))
-        }
-    }
-
-    private fun norm(s: String): String =
-        s.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() && it !in NOISE }.joinToString("")
+    /** TMDB provider ids (all variants, e.g. Netflix + Netflix basic with Ads) for a service. */
+    fun idsFor(service: Service, providers: List<Provider>): List<Int> =
+        providers.filter { service.matchesTmdbName(it.name) }.map { it.id }
 
     fun rows(context: Context, apps: List<AppInfo>, region: String): List<HomeRow> {
         val out = ArrayList<HomeRow>()
         val providers = providers(context, region)
-        for ((app, p) in matchProviders(apps, providers)) {
+        for ((service, app) in Services.installed(apps)) {
+            val ids = idsFor(service, providers)
+            if (ids.isEmpty()) continue
             val titles = interleave(
-                discover(context, "movie", p.id, region),
-                discover(context, "tv", p.id, region)
+                discover(context, "movie", ids, region),
+                discover(context, "tv", ids, region)
             )
-            if (titles.isNotEmpty()) out += HomeRow("On ${app.label}", titles, app.packageName, p.name)
+            if (titles.isNotEmpty()) out += HomeRow("On ${app.label}", titles, app.packageName, service.name)
         }
-        trending(context)?.takeIf { it.isNotEmpty() }?.let { out += HomeRow("Trending this week", it, null, null) }
-        topRated(context, region)?.takeIf { it.isNotEmpty() }?.let { out += HomeRow("Top rated films", it, null, null) }
+        // Rows across every service we know how to open, so each card is playable or installable.
+        val known = Services.ALL.flatMap { idsFor(it, providers) }.distinct()
+        if (known.isNotEmpty()) {
+            interleave(
+                discover(context, "movie", known, region),
+                discover(context, "tv", known, region)
+            ).takeIf { it.isNotEmpty() }?.let { out += HomeRow("Popular on streaming", it, null, null) }
+            topRated(context, known, region).takeIf { it.isNotEmpty() }?.let { out += HomeRow("Top rated on streaming", it, null, null) }
+        }
+        Log.i("EGate", "home rows: ${out.map { "${it.header} (${it.titles.size})" }}")
         return out
     }
 
@@ -147,18 +101,20 @@ object Tmdb {
     }
 
     // ---------- endpoints ----------
-    private fun discover(context: Context, kind: String, provider: Int, region: String): List<Title> {
+    private const val MONETIZATION = "with_watch_monetization_types=flatrate|free|ads"
+
+    private fun discover(context: Context, kind: String, providerIds: List<Int>, region: String): List<Title> {
         val floor = if (kind == "movie") 300 else 100
-        val q = "/discover/$kind?with_watch_providers=$provider&watch_region=$region" +
-            "&sort_by=popularity.desc&vote_count.gte=$floor&with_watch_monetization_types=flatrate|free|ads"
+        val q = "/discover/$kind?with_watch_providers=${providerIds.joinToString("|")}&watch_region=$region" +
+            "&sort_by=popularity.desc&vote_count.gte=$floor&$MONETIZATION"
         return parseList(get(context, q, ROWS_TTL), kind)
     }
 
-    private fun trending(context: Context): List<Title>? =
-        get(context, "/trending/all/week", ROWS_TTL)?.let { parseList(it, null).filter { t -> t.kind != "person" } }
-
-    private fun topRated(context: Context, region: String): List<Title>? =
-        get(context, "/movie/top_rated?region=$region", ROWS_TTL)?.let { parseList(it, "movie") }
+    private fun topRated(context: Context, providerIds: List<Int>, region: String): List<Title> {
+        val q = "/discover/movie?with_watch_providers=${providerIds.joinToString("|")}&watch_region=$region" +
+            "&sort_by=vote_average.desc&vote_count.gte=2000&$MONETIZATION"
+        return parseList(get(context, q, ROWS_TTL), "movie")
+    }
 
     private fun interleave(a: List<Title>, b: List<Title>): List<Title> {
         val out = ArrayList<Title>()
