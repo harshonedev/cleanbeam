@@ -1,11 +1,9 @@
 package io.egate.launcher
 
 import android.content.Context
-import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewParent
-import android.view.animation.DecelerateInterpolator
 import androidx.recyclerview.widget.RecyclerView
 
 /**
@@ -17,6 +15,8 @@ class FocusRowRecyclerView @JvmOverloads constructor(
 ) : RecyclerView(context, attrs) {
 
     var upTarget: View? = null
+
+    init { layoutManager = ParkingLayoutManager(context, HORIZONTAL) }
 
     override fun focusSearch(focused: View?, direction: Int): View? {
         if (direction == View.FOCUS_UP) upTarget?.let { return it }
@@ -33,10 +33,4 @@ class FocusRowRecyclerView @JvmOverloads constructor(
         return false
     }
 
-    override fun requestChildRectangleOnScreen(child: View, rect: Rect, immediate: Boolean): Boolean {
-        val dx = child.left - paddingLeft
-        if (dx == 0) return false
-        if (immediate) scrollBy(dx, 0) else smoothScrollBy(dx, 0, DecelerateInterpolator(2f), 260)
-        return true
-    }
 }

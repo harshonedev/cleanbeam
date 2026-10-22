@@ -1,21 +1,20 @@
 package io.egate.launcher
 
 import android.content.Context
-import android.graphics.Rect
 import android.util.AttributeSet
-import android.view.View
-import android.view.animation.DecelerateInterpolator
+import android.view.ViewOutlineProvider
 import androidx.recyclerview.widget.RecyclerView
 
 /** Vertical stack of shelves; the shelf holding focus parks at the top padding. */
 class ShelvesRecyclerView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
 ) : RecyclerView(context, attrs) {
-
-    override fun requestChildRectangleOnScreen(child: View, rect: Rect, immediate: Boolean): Boolean {
-        val dy = child.top - paddingTop
-        if (dy == 0) return false
-        if (immediate) scrollBy(0, dy) else smoothScrollBy(0, dy, DecelerateInterpolator(2f), 300)
-        return true
+    init {
+        layoutManager = ParkingLayoutManager(context, VERTICAL)
+        // The parent keeps clipChildren off for the app row's scaled cards, which in hardware
+        // rendering also un-clips this view; clip to our own outline so shelves scrolled above
+        // the top edge don't paint over the hero.
+        outlineProvider = ViewOutlineProvider.BOUNDS
+        clipToOutline = true
     }
 }

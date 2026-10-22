@@ -55,7 +55,7 @@ object Tmdb {
         "paramount" to listOf("Paramount Plus"),
         "viki" to listOf("Viki")
     )
-    private val NOISE = setOf("video", "plus", "play", "tv", "app", "the", "for", "android", "premium", "channel")
+    private val NOISE = setOf("video", "plus", "play", "tv", "app", "the", "for", "android", "premium", "channel", "store", "with", "ads", "free")
 
     class Provider(val id: Int, val name: String, val priority: Int)
 
@@ -106,14 +106,18 @@ object Tmdb {
             if (!pkg.contains(frag)) continue
             for (n in names) byName[n.lowercase()]?.let { return it }
         }
-        // Fallback: a distinctive word shared between the app label and a provider name.
-        val words = tokens(app.label)
-        if (words.isEmpty()) return null
-        return providers.firstOrNull { p -> tokens(p.name).any { it in words } }
+        // Fallback: the label and the provider name collapse to the same word ("MX Player" / "mxplayer"),
+        // or one contains the other ("CLAP Netflix" / "Netflix"). Short names must match exactly.
+        val a = norm(app.label)
+        if (a.isEmpty()) return null
+        return providers.firstOrNull { p ->
+            val b = norm(p.name)
+            b.isNotEmpty() && (a == b || (b.length >= 4 && a.length >= 4 && (a.contains(b) || b.contains(a))))
+        }
     }
 
-    private fun tokens(s: String): Set<String> =
-        s.lowercase().split(Regex("[^a-z0-9]+")).filter { it.length >= 4 && it !in NOISE }.toSet()
+    private fun norm(s: String): String =
+        s.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() && it !in NOISE }.joinToString("")
 
     fun rows(context: Context, apps: List<AppInfo>, region: String): List<HomeRow> {
         val out = ArrayList<HomeRow>()

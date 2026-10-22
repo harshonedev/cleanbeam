@@ -33,7 +33,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -81,6 +80,7 @@ class LauncherActivity : AppCompatActivity() {
     private var tintDrawable = GradientDrawable()
     private var wallpaperKey = ""
     private var firstLoad = true
+    private var homeFirstShow = true           // cold start lands on the first card even if a tab holds focus
     private var heroGen = 0                    // bumps per hero change so a cancelled fade can't leave it hidden
 
     private val io = Executors.newSingleThreadExecutor()
@@ -145,7 +145,6 @@ class LauncherActivity : AppCompatActivity() {
             onClick = { launchApp(it) },
             onLongClick = { appMenu(it) },
             onFocus = { onCardFocused(it) })
-        row.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         row.adapter = adapter
         row.itemAnimator = null
 
@@ -154,7 +153,6 @@ class LauncherActivity : AppCompatActivity() {
             onLongClick = { t, r -> titleMenu(t, r) },
             onFocus = { t, r -> onCardFocused(t to r) })
         shelvesAdapter.upTarget = tabHome
-        shelves.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         shelves.adapter = shelvesAdapter
         shelves.itemAnimator = null
 
@@ -467,8 +465,10 @@ class LauncherActivity : AppCompatActivity() {
         val cur = heroItem as? Pair<*, *>
         if (cur == null || !rows.contains(cur.second)) {
             onCardFocused(rows[0].titles[0] to rows[0])
-            if (!focusInTabs) focusFirstShelfCard()
+            // Cold start: land on the first card. Later refreshes leave a user who is on the tabs alone.
+            if (!focusInTabs || homeFirstShow) focusFirstShelfCard()
         }
+        homeFirstShow = false
     }
 
     private fun firstCard(rv: View?): View? =
@@ -535,12 +535,10 @@ class LauncherActivity : AppCompatActivity() {
             t.year,
             if (t.rating > 0) String.format(Locale.US, "%.1f on TMDB", t.rating) else null
         ).joinToString(", ")
-        val meta = r.providerName?.let { "On $it" } ?: ""
         swapHero(animate = true) {
             heroTitle.text = t.name
             heroSubtitle.text = subtitle
-            heroMeta.text = meta
-            heroMeta.visibility = if (meta.isEmpty()) View.GONE else View.VISIBLE
+            heroMeta.visibility = View.GONE
             heroBody.text = t.overview
             heroBody.visibility = if (t.overview.isBlank()) View.GONE else View.VISIBLE
         }

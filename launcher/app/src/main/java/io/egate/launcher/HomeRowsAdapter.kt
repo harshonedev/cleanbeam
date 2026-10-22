@@ -4,7 +4,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 /** Vertical list of shelves; each shelf is a header plus a horizontal FocusRowRecyclerView. */
@@ -27,7 +26,6 @@ class HomeRowsAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.item_home_row, parent, false)
         val vh = VH(v)
-        vh.row.layoutManager = LinearLayoutManager(parent.context, LinearLayoutManager.HORIZONTAL, false)
         vh.row.setRecycledViewPool(pool)
         vh.row.itemAnimator = null
         return vh
