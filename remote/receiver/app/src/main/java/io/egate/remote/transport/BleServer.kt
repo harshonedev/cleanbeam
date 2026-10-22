@@ -14,7 +14,10 @@ import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.ParcelUuid
 import android.util.Log
 import io.egate.remote.protocol.Chunker
@@ -57,35 +60,67 @@ class BleServer(private val ctx: Context, private val router: CommandRouter) {
             sending = true
             Thread {
                 try {
-                    while (true) {
-                        val chunk = outbox.poll() ?: break
-                        evtChar.value = chunk
+                    var busyRetries = 0
+                    while (clients[device.address] === this) {
+                        val chunk = outbox.peek() ?: break
                         val g = gatt ?: break
                         sentAck.clear()
-                        if (!g.notifyCharacteristicChanged(device, evtChar, false)) break
-                        sentAck.poll(2, TimeUnit.SECONDS)
+                        val status = g.notifyCharacteristicChanged(device, evtChar, false, chunk)
+                        if (status == android.bluetooth.BluetoothStatusCodes.SUCCESS) {
+                            outbox.poll()
+                            busyRetries = 0
+                            sentAck.poll(2, TimeUnit.SECONDS)
+                        } else if (status == android.bluetooth.BluetoothStatusCodes.ERROR_GATT_WRITE_REQUEST_BUSY && busyRetries++ < 20) {
+                            Thread.sleep(20) // stack still busy with the previous notification; keep the chunk
+                        } else {
+                            Log.w(TAG, "notify failed status=$status; dropping ${outbox.size} chunks"); outbox.clear(); break
+                        }
                     }
                 } finally {
                     sending = false
-                    if (outbox.isNotEmpty()) pump()
+                    if (outbox.isNotEmpty() && clients[device.address] === this) pump()
                 }
             }.start()
         }
     }
 
+    private var stateReceiver: BroadcastReceiver? = null
+
+    /** Opens the GATT server now if Bluetooth is on, and (re)opens it whenever Bluetooth turns on later. */
     fun start() {
+        if (stateReceiver == null) {
+            stateReceiver = object : BroadcastReceiver() {
+                override fun onReceive(c: Context, i: Intent) {
+                    when (i.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
+                        BluetoothAdapter.STATE_ON -> { Log.i(TAG, "bluetooth on → restarting gatt"); closeGatt(); openGatt() }
+                        BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_OFF -> closeGatt()
+                    }
+                }
+            }.also { ctx.registerReceiver(it, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)) }
+        }
+        openGatt()
+    }
+
+    fun stop() {
+        stateReceiver?.let { runCatching { ctx.unregisterReceiver(it) } }
+        stateReceiver = null
+        closeGatt()
+    }
+
+    private fun openGatt() {
         val adapter = manager.adapter ?: run { Log.w(TAG, "no bluetooth adapter"); return }
-        if (!adapter.isEnabled) { Log.w(TAG, "bluetooth disabled"); return }
-        try { if (adapter.name != LOCAL_NAME) adapter.name = LOCAL_NAME } catch (_: SecurityException) {}
+        if (!adapter.isEnabled) { Log.w(TAG, "bluetooth disabled; will start when it turns on"); return }
+        if (gatt != null) return
         gatt = manager.openGattServer(ctx, callback)?.also { it.addService(buildService()) }
         advertiser = adapter.bluetoothLeAdvertiser
         startAdvertising()
     }
 
-    fun stop() {
+    private fun closeGatt() {
         try { advertiser?.stopAdvertising(adCallback) } catch (_: Exception) {}
         try { gatt?.close() } catch (_: Exception) {}
         gatt = null
+        advertiser = null
         clients.clear()
     }
 

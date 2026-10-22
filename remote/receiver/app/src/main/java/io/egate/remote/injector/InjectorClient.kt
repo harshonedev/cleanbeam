@@ -18,16 +18,20 @@ class InjectorClient(
     private val spawner: Spawner,
     private val connector: Connector,
     private val retryDelayMs: Long = 200,
-    private val spawnTimeoutMs: Long = 5_000,
+    private val spawnTimeoutMs: Long = 8_000,
+    private val cooldownMs: Long = 10_000,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
     interface Spawner { fun spawn() }
     interface Connector { fun connect(): LineChannel? }
     interface LineChannel : Closeable { fun send(line: String): String }
 
     private var channel: LineChannel? = null
+    private var failedUntil = 0L
 
     @Synchronized
     fun send(json: String): String {
+        if (channel == null && clock() < failedUntil) throw IOException("injector unavailable (cooling down)")
         val ch = channel ?: ensureConnected()
         return try {
             ch.send(json)
@@ -48,6 +52,7 @@ class InjectorClient(
             if (retryDelayMs > 0) Thread.sleep(retryDelayMs)
             connector.connect()?.let { channel = it; return it }
         }
+        failedUntil = clock() + cooldownMs
         throw IOException("injector helper did not come up within ${spawnTimeoutMs}ms")
     }
 
@@ -86,6 +91,7 @@ class InjectorClient(
                 override fun connect(): LineChannel? = try {
                     val s = LocalSocket()
                     s.connect(LocalSocketAddress(Main.socketName(appUid), LocalSocketAddress.Namespace.ABSTRACT))
+                    s.soTimeout = 3_000 // a wedged helper must not block every later command
                     val peer = s.peerCredentials.uid
                     if (!isTrustedHelperUid(peer)) {
                         Log.w(TAG, "injector socket owned by untrusted uid $peer; refusing")

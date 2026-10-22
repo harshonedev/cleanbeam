@@ -19,6 +19,11 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
     private val charMap: KeyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD)
     @Volatile private var size: Pair<Int, Int> = 1280 to 720
 
+    /** Real pointer via the vendor evdev mouse when present; injected MotionEvents otherwise (no sprite). */
+    private val evdev: EvdevMouse? = EvdevMouse.open().also {
+        System.err.println(if (it != null) "pointer: evdev jixin_mouse" else "pointer: injectInputEvent fallback")
+    }
+
     init {
         val cls = Class.forName("android.hardware.input.InputManager")
         inputManager = cls.getMethod("getInstance").invoke(null)!!
@@ -39,6 +44,9 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
         }
     }
 
+    private var lastX = size.first / 2f
+    private var lastY = size.second / 2f
+
     override fun now(): Long = SystemClock.uptimeMillis()
 
     override fun displaySize(): Pair<Int, Int> = size
@@ -52,6 +60,18 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
     }
 
     override fun motion(action: Int, x: Float, y: Float, buttonState: Int, vScroll: Float): Boolean {
+        evdev?.let { m ->
+            return try {
+                when (action) {
+                    MotionEvent.ACTION_HOVER_MOVE -> m.move((x - lastX).toInt(), (y - lastY).toInt()).let { lastX = x; lastY = y; true }
+                    MotionEvent.ACTION_BUTTON_PRESS -> { m.click(buttonState == InputInjector.BUTTON_SECONDARY); true }
+                    MotionEvent.ACTION_SCROLL -> { m.scroll((-vScroll).toInt()); true }
+                    else -> true // DOWN/UP/BUTTON_RELEASE are implied by click()
+                }
+            } catch (e: Exception) {
+                System.err.println("evdev write failed: $e"); false
+            }
+        }
         val now = SystemClock.uptimeMillis()
         val props = MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_MOUSE }
         val coords = MotionEvent.PointerCoords().apply {

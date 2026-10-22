@@ -122,6 +122,7 @@ class _ManualSheetState extends State<_ManualSheet> {
   Map<String, String> _found = {};
   String? _selected;
   final _code = TextEditingController();
+  final _ip = TextEditingController();
   bool _searching = true;
   bool _pairing = false;
   String? _error;
@@ -129,7 +130,7 @@ class _ManualSheetState extends State<_ManualSheet> {
   @override
   void initState() {
     super.initState();
-    listProjectors().then((f) {
+    listProjectors(wait: const Duration(seconds: 6)).then((f) {
       if (!mounted) return;
       setState(() {
         _found = f;
@@ -140,10 +141,14 @@ class _ManualSheetState extends State<_ManualSheet> {
   }
 
   Future<void> _pair() async {
-    final name = _selected;
-    final ip = name == null ? null : _found[name];
+    var name = _selected;
+    var ip = name == null ? null : _found[name];
+    if (ip == null && _ip.text.trim().isNotEmpty) {
+      ip = _ip.text.trim();
+      name = 'EGate Atom3X';
+    }
     if (ip == null) {
-      setState(() => _error = 'Pick a projector first.');
+      setState(() => _error = 'Pick a projector, or type its IP address (shown under the code on the projector).');
       return;
     }
     setState(() {
@@ -178,8 +183,15 @@ class _ManualSheetState extends State<_ManualSheet> {
           const SizedBox(height: 16),
           if (_searching)
             const Row(children: [SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)), SizedBox(width: 12), Text('Looking for projectors on this Wi-Fi…')])
-          else if (_found.isEmpty)
-            const Text('No projector found on this Wi-Fi. Both devices must be on the same network for code pairing.', style: TextStyle(color: Tokens.muted))
+          else if (_found.isEmpty) ...[
+            const Text('No projector found on this Wi-Fi. Type the address shown under the code on the projector.', style: TextStyle(color: Tokens.muted)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _ip,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Projector IP address', hintText: '192.168.1.20'),
+            ),
+          ]
           else
             Wrap(
               spacing: 8,

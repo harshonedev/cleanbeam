@@ -78,3 +78,22 @@ class InjectorClientTest {
         }
     }
 }
+
+class InjectorCooldownTest {
+    @Test
+    fun `after a failed spawn, sends fail fast until the cooldown passes`() {
+        var now = 0L
+        var connectCalls = 0
+        val connector = object : InjectorClient.Connector { override fun connect(): InjectorClient.LineChannel? { connectCalls++; return null } }
+        val c = InjectorClient(object : InjectorClient.Spawner { override fun spawn() {} }, connector,
+            retryDelayMs = 0, spawnTimeoutMs = 0, cooldownMs = 10_000, clock = { now })
+        try { c.send("a"); throw AssertionError() } catch (e: IOException) {}
+        val callsAfterFirst = connectCalls
+        now = 5_000
+        try { c.send("b"); throw AssertionError() } catch (e: IOException) { assertEquals(true, e.message!!.contains("cooling down")) }
+        assertEquals(callsAfterFirst, connectCalls) // no connect attempt during cooldown
+        now = 11_000
+        try { c.send("c") } catch (e: IOException) {}
+        assertEquals(true, connectCalls > callsAfterFirst)
+    }
+}

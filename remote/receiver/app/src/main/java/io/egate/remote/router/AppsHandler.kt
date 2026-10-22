@@ -40,17 +40,22 @@ class AppsHandler(private val ctx: Context) : AppsProvider {
         return try { ctx.startActivity(intent); true } catch (e: Exception) { false }
     }
 
+    private var lastForeground: String? = null
+    private var lastForegroundScan = 0L
+
+    /** Scans only the usage events since the previous scan (first scan: last 10 minutes). */
     override fun foregroundApp(): String? {
         val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val now = System.currentTimeMillis()
-        val events = usm.queryEvents(now - 6 * 60 * 60 * 1000, now)
+        val from = if (lastForegroundScan == 0L) now - 10 * 60 * 1000 else lastForegroundScan - 1000
+        val events = usm.queryEvents(from, now)
         val ev = UsageEvents.Event()
-        var last: String? = null
         while (events.hasNextEvent()) {
             events.getNextEvent(ev)
-            if (ev.eventType == UsageEvents.Event.ACTIVITY_RESUMED) last = ev.packageName
+            if (ev.eventType == UsageEvents.Event.ACTIVITY_RESUMED) lastForeground = ev.packageName
         }
-        return last
+        lastForegroundScan = now
+        return lastForeground
     }
 
     override fun volume(): Pair<Int, Int> {

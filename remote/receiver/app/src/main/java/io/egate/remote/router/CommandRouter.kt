@@ -48,8 +48,8 @@ class CommandRouter(
             if (!authenticated) { handleUnauthenticated(cmd); return }
             val reply: Event? = when (cmd) {
                 is Command.Key, is Command.Text, is Command.Mouse, is Command.Click, is Command.Scroll, is Command.Power -> {
-                    val r = injector(json)
-                    if (r.contains("\"err\"")) Event.Err("inject failed") else null
+                    val r = try { injector(json) } catch (e: Exception) { "{\"t\":\"err\",\"msg\":\"injector unavailable\"}" }
+                    if (r.contains("\"err\"")) Event.Err(if (r.contains("unavailable")) "injector unavailable" else "inject failed") else null
                 }
                 is Command.Launch -> if (apps.launch(cmd.pkg)) null else Event.Err("cannot launch ${cmd.pkg}")
                 Command.Apps -> Event.Apps(apps.list())

@@ -139,3 +139,16 @@ class CommandRouterTest {
         assertTrue(s.sent[1].startsWith("""{"t":"err""""))
     }
 }
+
+class RouterInjectorFailureTest {
+    @Test
+    fun `injector exception becomes an err event instead of escaping`() {
+        val creds = FakeCredentials()
+        val router = CommandRouter(creds, { throw java.io.IOException("down") }, FakeApps(), "n", "1")
+        val s = FakeSession()
+        val c = router.newConnection(s)
+        c.onMessage("""{"t":"auth","token":"TOKEN"}""")
+        c.onMessage("""{"t":"key","code":20,"action":"tap"}""")
+        assertEquals("""{"t":"err","msg":"injector unavailable"}""", s.sent[1])
+    }
+}
