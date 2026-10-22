@@ -85,6 +85,7 @@ class LauncherActivity : AppCompatActivity() {
     private var homeRows: List<HomeRow> = emptyList()
     private var homeLoadedAt = 0L
     private var homeLoading = false
+    private var homeGen = 0                    // bumps per Home load so a superseded fetch can't land
     private var tab = Tab.APPS
     private var heroItem: Any? = null          // AppInfo, Pair<Title, HomeRow> or Tile
     private var bgFront = false                // which bg layer is visible: false = A, true = B
@@ -97,6 +98,7 @@ class LauncherActivity : AppCompatActivity() {
     private var heroGen = 0                    // bumps per hero change so a cancelled fade can't leave it hidden
 
     private val io = Executors.newSingleThreadExecutor()
+    private val rowsIo = Executors.newFixedThreadPool(3)   // Home shelves fetch side by side
     private val handler = Handler(Looper.getMainLooper())
     private val ease = PathInterpolator(0.2f, 0f, 0f, 1f)
     private val heroRunnable = Runnable {
@@ -620,48 +622,76 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     // ---------- home (TMDB) ----------
-    /** Favorites shelf first, then the TMDB shelves. */
+    /** Favorites shelf first, then the TMDB shelves (loaded, or skeletons while they load). */
     private fun displayRows(): List<HomeRow> {
         val favs = favoriteApps()
         val favRow = if (favs.isEmpty()) emptyList() else listOf(HomeRow(getString(R.string.tab_favorites), emptyList(), null, null, favs))
-        return favRow + homeRows
+        return favRow + homeRows.filter { it.visible }
     }
 
     private fun populateHome() {
         row.visibility = View.GONE
         grid.visibility = View.GONE
         val configured = Tmdb.configured(this)
+        val stale = System.currentTimeMillis() - homeLoadedAt > Tmdb.ROWS_TTL
+        // Kick the fetch first: on a cold start it seeds skeleton shelves so the tab paints at once.
+        if (configured && (stale || homeRows.isEmpty()) && !homeLoading && allApps.isNotEmpty()) loadHome()
+        if (!configured && homeRows.isEmpty() && favoriteApps().isEmpty()) {
+            shelves.visibility = View.GONE
+            shelvesAdapter.submit(emptyList())
+            showEmpty(R.string.home_no_token, R.string.home_no_token_hint)
+            return
+        }
+        renderHome()
+    }
+
+    /** Draw whatever Home has right now: favorites, finished shelves, skeletons; or the empty state. */
+    private fun renderHome() {
         val rows = displayRows()
         if (rows.isEmpty()) {
             shelves.visibility = View.GONE
             shelvesAdapter.submit(emptyList())
-            if (!configured) showEmpty(R.string.home_no_token, R.string.home_no_token_hint)
-            else if (!homeLoading || allApps.isEmpty()) showEmpty(R.string.home_empty, R.string.home_empty_hint)
-            if (configured && allApps.isNotEmpty() && !homeLoading) loadHome()
-            return
-        }
-        empty.visibility = View.GONE
-        shelves.visibility = View.VISIBLE
-        showShelves(rows)
-        if (!configured) return
-        val stale = System.currentTimeMillis() - homeLoadedAt > Tmdb.ROWS_TTL
-        if ((stale || homeRows.isEmpty()) && !homeLoading && allApps.isNotEmpty()) loadHome()
+            showEmpty(R.string.home_empty, R.string.home_empty_hint)
+        } else showShelves(rows)
     }
 
+    /**
+     * Shelves load one by one, side by side. On a cold start each starts as a skeleton row and is
+     * swapped in as it arrives; a refresh behind rows already on screen swaps them all at the end.
+     */
     private fun loadHome() {
         homeLoading = true
+        val gen = ++homeGen
         val apps = allApps
         val reg = region
+        val pending = Tmdb.plan(this, apps, reg)
+        val cold = homeRows.isEmpty()
+        if (cold) homeRows = pending.map { it.row }
+        val done = arrayOfNulls<HomeRow>(pending.size)
+        val remaining = java.util.concurrent.atomic.AtomicInteger(pending.size)
         io.execute {
-            val rows = runCatching { Tmdb.rows(this, apps, reg) }
-                .onFailure { Log.e("EGate", "tmdb rows failed", it) }.getOrDefault(emptyList())
-            handler.post {
-                homeLoading = false
-                if (rows.isNotEmpty()) { homeRows = rows; homeLoadedAt = System.currentTimeMillis() }
-                if (tab != Tab.HOME) return@post
-                val all = displayRows()
-                if (all.isEmpty()) { shelves.visibility = View.GONE; showEmpty(R.string.home_empty, R.string.home_empty_hint) }
-                else if (rows.isNotEmpty()) showShelves(all)
+            val providers = runCatching { Tmdb.providers(this, reg) }
+                .onFailure { Log.e("EGate", "tmdb providers failed", it) }.getOrDefault(emptyList())
+            pending.forEachIndexed { i, p ->
+                rowsIo.execute {
+                    val r = runCatching { p.load(providers) }
+                        .onFailure { Log.e("EGate", "tmdb row '${p.row.header}' failed", it) }
+                        .getOrDefault(p.row.copy(loading = false))
+                    done[i] = r
+                    val last = remaining.decrementAndGet() == 0
+                    handler.post {
+                        if (gen != homeGen) return@post
+                        if (cold) homeRows = homeRows.map { if (it.header == r.header) r else it }
+                        if (last) {
+                            homeLoading = false
+                            val rows = done.filterNotNull().filter { it.titles.isNotEmpty() }
+                            Log.i("EGate", "home rows: ${rows.map { "${it.header} (${it.titles.size})" }}")
+                            if (rows.isNotEmpty()) { homeRows = rows; homeLoadedAt = System.currentTimeMillis() }
+                            else if (cold) homeRows = emptyList()
+                        }
+                        if ((cold || last) && tab == Tab.HOME) renderHome()
+                    }
+                }
             }
         }
     }
@@ -672,13 +702,13 @@ class LauncherActivity : AppCompatActivity() {
         val before = currentFocus
         val focusWasInShelves = before != null && shelves.findContainingItemView(before) != null
         shelvesAdapter.submit(rows)
-        shelves.scrollToPosition(0)
         val focused = currentFocus
         val focusInShelves = focused != null && shelves.findContainingItemView(focused) != null
-        // A full rebind recreates the cards; if that took focus away, put it back on the first card.
+        // A rebind recreated the focused card: put focus back on the first card.
         if (focusWasInShelves && !focusInShelves) focusFirstShelfCard()
         if (!focusInShelves && !focusWasInShelves) {
-            val first = rows[0]
+            // Skeletons only: the hero and the landing focus wait for the first real shelf.
+            val first = rows.firstOrNull { !it.loading } ?: return
             onCardFocused(if (first.isAppRow) first.apps[0] else first.titles[0] to first)
             // Cold start (or nothing focused): land on the first card. From a tab: leave focus on the tab.
             if (focused == null || homeFirstShow) focusFirstShelfCard()
@@ -689,10 +719,12 @@ class LauncherActivity : AppCompatActivity() {
     private fun firstCard(rv: View?): View? =
         (rv as? FocusRowRecyclerView)?.getChildAt(0)?.findViewById(R.id.card)
 
+    /** First focusable card on screen; skeleton shelves are skipped. */
     private fun focusFirstShelfCard(attempt: Int = 0) {
         shelves.post {
-            val inner = shelves.getChildAt(0)?.findViewById<FocusRowRecyclerView>(R.id.row_titles)
-            val card = firstCard(inner)
+            val card = (0 until shelves.childCount).asSequence()
+                .map { firstCard(shelves.getChildAt(it)?.findViewById(R.id.row_titles)) }
+                .firstOrNull { it?.isFocusable == true }
             if (card != null) card.requestFocus()
             else if (attempt < 8 && tab == Tab.HOME) handler.postDelayed({ focusFirstShelfCard(attempt + 1) }, 60)
             else Log.w("EGate", "first shelf card not found after $attempt attempts")

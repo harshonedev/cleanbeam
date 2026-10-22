@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 
 /** Vertical list of shelves; each shelf is a header plus a horizontal FocusRowRecyclerView. */
@@ -21,18 +22,29 @@ class HomeRowsAdapter(
     var upTarget: View? = null
     /** Title rows share recycled cards; app rows use a different item layout so they keep their own. */
     private val titlePool = RecyclerView.RecycledViewPool()
+    private val skeletonPool = RecyclerView.RecycledViewPool()
 
     class VH(view: View) : RecyclerView.ViewHolder(view) {
         val header: TextView = view.findViewById(R.id.row_header)
         val row: FocusRowRecyclerView = view.findViewById(R.id.row_titles)
     }
 
-    override fun getItemViewType(position: Int) = if (rows[position].isAppRow) TYPE_APPS else TYPE_TITLES
+    override fun getItemViewType(position: Int): Int {
+        val r = rows[position]
+        return when {
+            r.loading -> TYPE_SKELETON
+            r.isAppRow -> TYPE_APPS
+            else -> TYPE_TITLES
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.item_home_row, parent, false)
         val vh = VH(v)
-        if (viewType == TYPE_TITLES) vh.row.setRecycledViewPool(titlePool)
+        when (viewType) {
+            TYPE_TITLES -> vh.row.setRecycledViewPool(titlePool)
+            TYPE_SKELETON -> vh.row.setRecycledViewPool(skeletonPool)
+        }
         vh.row.itemAnimator = null
         return vh
     }
@@ -41,22 +53,30 @@ class HomeRowsAdapter(
         val r = rows[position]
         holder.header.text = r.header
         holder.row.upTarget = if (position == 0) upTarget else null
-        holder.row.adapter =
-            if (r.isAppRow) AppAdapter(r.apps, onAppClick, onAppLongClick, onAppFocus)
-            else TitleAdapter(r, onClick, onLongClick, onFocus)
+        holder.row.adapter = when {
+            r.loading -> SkeletonAdapter()
+            r.isAppRow -> AppAdapter(r.apps, onAppClick, onAppLongClick, onAppFocus)
+            else -> TitleAdapter(r, onClick, onLongClick, onFocus)
+        }
     }
 
     override fun getItemCount() = rows.size
 
-    /** Rows appended to an unchanged prefix are inserted, so cards already on screen (and focus) survive. */
+    /**
+     * Shelves are matched by header, so a skeleton turning into its titles rebinds only that row
+     * and cards already on screen (and focus) survive. A row that loaded empty is dropped.
+     */
     fun submit(newRows: List<HomeRow>) {
         val old = rows
         rows = newRows
-        if (newRows.size > old.size && old.isNotEmpty() && newRows.subList(0, old.size) == old)
-            notifyItemRangeInserted(old.size, newRows.size - old.size)
-        else notifyDataSetChanged()
+        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = old.size
+            override fun getNewListSize() = newRows.size
+            override fun areItemsTheSame(o: Int, n: Int) = old[o].header == newRows[n].header
+            override fun areContentsTheSame(o: Int, n: Int) = old[o] == newRows[n]
+        }, false).dispatchUpdatesTo(this)
     }
     fun row(position: Int): HomeRow? = rows.getOrNull(position)
 
-    companion object { const val TYPE_TITLES = 0; const val TYPE_APPS = 1 }
+    companion object { const val TYPE_TITLES = 0; const val TYPE_APPS = 1; const val TYPE_SKELETON = 2 }
 }

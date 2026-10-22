@@ -44,8 +44,7 @@
         android:layout_height="match_parent"
         android:clipChildren="false"
         android:clipToPadding="false"
-        android:paddingTop="28dp"
-        android:paddingBottom="22dp">
+        android:paddingTop="28dp">
 
         <!-- tabs -->
         <LinearLayout
@@ -228,7 +227,6 @@
             android:layout_height="0dp"
             android:clipChildren="true"
             android:clipToPadding="false"
-            android:paddingBottom="400dp"
             android:visibility="gone"
             app:layout_constraintTop_toTopOf="@id/shelf_top"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -273,7 +271,7 @@
             android:textColor="@color/text_muted"
             android:textSize="12sp"
             android:visibility="gone"
-            android:layout_marginBottom="4dp"
+            android:layout_marginBottom="26dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             tools:text="RAM 1.2G free   Storage 9G free" />

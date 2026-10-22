@@ -63,27 +63,42 @@ object Tmdb {
     fun idsFor(service: Service, providers: List<Provider>): List<Int> =
         providers.filter { service.matchesTmdbName(it.name) }.map { it.id }
 
-    fun rows(context: Context, apps: List<AppInfo>, region: String): List<HomeRow> {
-        val out = ArrayList<HomeRow>()
-        val providers = providers(context, region)
+    /** One Home shelf waiting for its titles: the skeleton [row] to show now, and [load] to fill it. */
+    class Pending(val row: HomeRow, private val fetch: (List<Provider>) -> List<Title>) {
+        /** Call off the main thread. Returns the finished row, with no titles when nothing streams here. */
+        fun load(providers: List<Provider>): HomeRow = row.copy(titles = fetch(providers), loading = false)
+    }
+
+    /**
+     * The shelves Home will show, in order, before any network call: one per installed streaming
+     * app, then the cross-service rows. Each knows how to fetch itself once the providers are known.
+     */
+    fun plan(context: Context, apps: List<AppInfo>, region: String): List<Pending> {
+        val out = ArrayList<Pending>()
         for ((service, app) in Services.installed(apps)) {
-            val ids = idsFor(service, providers)
-            if (ids.isEmpty()) continue
-            val titles = interleave(
-                discover(context, "movie", ids, region),
-                discover(context, "tv", ids, region)
-            )
-            if (titles.isNotEmpty()) out += HomeRow("On ${app.label}", titles, app.packageName, service.name)
+            out += Pending(HomeRow("On ${app.label}", emptyList(), app.packageName, service.name, loading = true)) { providers ->
+                val ids = idsFor(service, providers)
+                if (ids.isEmpty()) emptyList()
+                else interleave(discover(context, "movie", ids, region), discover(context, "tv", ids, region))
+            }
         }
         // Rows across every service we know how to open, so each card is playable or installable.
-        val known = Services.ALL.flatMap { idsFor(it, providers) }.distinct()
-        if (known.isNotEmpty()) {
-            interleave(
-                discover(context, "movie", known, region),
-                discover(context, "tv", known, region)
-            ).takeIf { it.isNotEmpty() }?.let { out += HomeRow("Popular on streaming", it, null, null) }
-            topRated(context, known, region).takeIf { it.isNotEmpty() }?.let { out += HomeRow("Top rated on streaming", it, null, null) }
+        out += Pending(HomeRow("Popular on streaming", emptyList(), null, null, loading = true)) { providers ->
+            val known = Services.ALL.flatMap { idsFor(it, providers) }.distinct()
+            if (known.isEmpty()) emptyList()
+            else interleave(discover(context, "movie", known, region), discover(context, "tv", known, region))
         }
+        out += Pending(HomeRow("Top rated on streaming", emptyList(), null, null, loading = true)) { providers ->
+            val known = Services.ALL.flatMap { idsFor(it, providers) }.distinct()
+            if (known.isEmpty()) emptyList() else topRated(context, known, region)
+        }
+        return out
+    }
+
+    /** Every shelf, fetched in one go. Used for a refresh behind rows already on screen. */
+    fun rows(context: Context, apps: List<AppInfo>, region: String): List<HomeRow> {
+        val providers = providers(context, region)
+        val out = plan(context, apps, region).map { it.load(providers) }.filter { it.titles.isNotEmpty() }
         Log.i("EGate", "home rows: ${out.map { "${it.header} (${it.titles.size})" }}")
         return out
     }
