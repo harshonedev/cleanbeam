@@ -2,36 +2,53 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:padding="10dp">
+    android:paddingHorizontal="9dp"
+    android:paddingVertical="18dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/card"
-        android:layout_width="150dp"
-        android:layout_height="130dp"
-        android:background="@drawable/card_bg"
+        android:layout_width="212dp"
+        android:layout_height="119dp"
+        android:background="@drawable/card_surface"
         android:focusable="true"
-        android:clickable="true"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:clickable="true">
 
         <ImageView
-            android:id="@+id/icon"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:scaleType="fitCenter"
+            android:id="@+id/banner"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
             android:contentDescription="@null" />
 
-        <TextView
-            android:id="@+id/label"
+        <FrameLayout
+            android:id="@+id/fallback"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:ellipsize="marquee"
-            android:gravity="center"
-            android:maxLines="1"
-            android:singleLine="true"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp" />
-    </LinearLayout>
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/icon"
+                android:layout_width="54dp"
+                android:layout_height="54dp"
+                android:layout_gravity="center"
+                android:layout_marginBottom="14dp"
+                android:scaleType="fitCenter"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:paddingHorizontal="12dp"
+                android:paddingBottom="9dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium" />
+        </FrameLayout>
+    </FrameLayout>
 </FrameLayout>

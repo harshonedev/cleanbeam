@@ -1,9 +1,10 @@
 <resources>
     <string name="app_name">EGate Home</string>
     <string name="screensaver_name">EGate Clock</string>
-    <string name="settings">Settings</string>
-    <string name="wifi">Wi-Fi</string>
-    <string name="options">Options</string>
-    <string name="apps">APPS</string>
-    <string name="favorites">FAVORITES</string>
+    <string name="tab_apps">Apps</string>
+    <string name="tab_favorites">Favorites</string>
+    <string name="tab_settings">Settings</string>
+    <string name="empty_favorites">No favorites yet</string>
+    <string name="empty_favorites_hint">Hold OK on any app and choose Pin to favorites.</string>
+    <string name="loading">Finding your apps…</string>
 </resources>

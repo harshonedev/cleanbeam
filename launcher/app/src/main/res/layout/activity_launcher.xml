@@ -1,118 +1,205 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingHorizontal="40dp"
-    android:paddingTop="34dp"
-    android:paddingBottom="24dp">
+    android:background="@drawable/bg_gradient">
 
-    <TextView
-        android:id="@+id/greeting"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="@color/text_secondary"
-        android:textSize="18sp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:text="Good evening" />
-
-    <TextView
-        android:id="@+id/clock"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="@color/text_primary"
-        android:textStyle="bold"
-        android:fontFamily="sans-serif-light"
-        app:layout_constraintTop_toBottomOf="@id/greeting"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:text="7:35 PM" />
-
-    <TextView
-        android:id="@+id/date"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="@color/text_secondary"
-        android:textSize="16sp"
-        app:layout_constraintTop_toBottomOf="@id/clock"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:text="Friday, 23 Oct" />
-
-    <TextView
-        android:id="@+id/stats"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:fontFamily="monospace"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/date"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:text="RAM 1.2G free   Storage 9G free" />
-
-    <LinearLayout
-        android:id="@+id/top_actions"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <TextView android:id="@+id/btn_options" style="@style/Pill" android:text="@string/options" />
-        <TextView android:id="@+id/btn_wifi" style="@style/Pill" android:layout_marginStart="14dp" android:text="@string/wifi" />
-        <TextView android:id="@+id/btn_settings" style="@style/Pill" android:layout_marginStart="14dp" android:text="@string/settings" />
-    </LinearLayout>
-
-    <LinearLayout
+    <!-- ambient art: two layers crossfade when the focused app changes -->
+    <ImageView
+        android:id="@+id/bg_a"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="26dp"
-        android:orientation="vertical"
-        app:layout_constraintTop_toBottomOf="@id/stats"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0"
+        android:contentDescription="@null" />
 
-        <TextView
-            android:id="@+id/fav_header"
+    <ImageView
+        android:id="@+id/bg_b"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0"
+        android:contentDescription="@null" />
+
+    <View
+        android:id="@+id/tint"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/scrim_left" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/scrim_bottom" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:paddingTop="28dp"
+        android:paddingBottom="22dp">
+
+        <!-- tabs -->
+        <LinearLayout
+            android:id="@+id/tabs"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/favorites"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:letterSpacing="0.15"
-            android:visibility="gone" />
+            android:layout_marginStart="50dp"
+            android:orientation="horizontal"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/fav_grid"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:clipToPadding="false"
-            android:visibility="gone" />
+            <TextView android:id="@+id/tab_apps" style="@style/Tab" android:text="@string/tab_apps" />
+            <TextView android:id="@+id/tab_favorites" style="@style/Tab" android:layout_marginStart="18dp" android:text="@string/tab_favorites" />
+            <TextView android:id="@+id/tab_settings" style="@style/Tab" android:layout_marginStart="18dp" android:text="@string/tab_settings" />
+        </LinearLayout>
 
-        <TextView
-            android:id="@+id/apps_header"
+        <View
+            android:id="@+id/tab_underline"
+            android:layout_width="24dp"
+            android:layout_height="3dp"
+            android:background="@drawable/tab_underline"
+            app:layout_constraintTop_toBottomOf="@id/tabs"
+            app:layout_constraintStart_toStartOf="@id/tabs" />
+
+        <!-- clock + wifi -->
+        <LinearLayout
+            android:id="@+id/status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="@string/apps"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:letterSpacing="0.15" />
+            android:layout_marginEnd="56dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintTop_toTopOf="@id/tabs"
+            app:layout_constraintBottom_toBottomOf="@id/tabs"
+            app:layout_constraintEnd_toEndOf="parent">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/grid"
+            <TextView
+                android:id="@+id/clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:fontFamily="sans-serif-medium"
+                tools:text="9:26 PM" />
+
+            <ImageView
+                android:id="@+id/wifi"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="14dp"
+                android:src="@drawable/ic_wifi"
+                android:contentDescription="@null" />
+        </LinearLayout>
+
+        <!-- hero -->
+        <LinearLayout
+            android:id="@+id/hero"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="56dp"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toTopOf="@id/row"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintWidth_percent="0.62">
+
+            <TextView
+                android:id="@+id/hero_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="44sp"
+                android:fontFamily="sans-serif-black"
+                android:letterSpacing="-0.02"
+                android:lineSpacingMultiplier="0.95"
+                android:maxLines="2"
+                android:ellipsize="end"
+                tools:text="Prime Video" />
+
+            <TextView
+                android:id="@+id/hero_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp"
+                tools:text="Video app, version 3.0.412" />
+
+            <TextView
+                android:id="@+id/hero_meta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp"
+                tools:text="Last opened 2 hours ago" />
+        </LinearLayout>
+
+        <!-- app row -->
+        <io.egate.launcher.FocusRowRecyclerView
+            android:id="@+id/row"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="12dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            android:clipChildren="false"
             android:clipToPadding="false"
-            android:paddingBottom="20dp" />
-    </LinearLayout>
+            android:paddingStart="47dp"
+            android:paddingEnd="900dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <LinearLayout
+            android:id="@+id/empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="56dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="@id/row"
+            app:layout_constraintBottom_toBottomOf="@id/row"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <TextView
+                android:id="@+id/empty_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/empty_favorites"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <TextView
+                android:id="@+id/empty_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/empty_favorites_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+
+        <TextView
+            android:id="@+id/stats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="56dp"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp"
+            android:visibility="gone"
+            android:layout_marginBottom="4dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:text="RAM 1.2G free   Storage 9G free" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</FrameLayout>

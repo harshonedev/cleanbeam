@@ -18,7 +18,7 @@ The pairing screen shows a QR code and a 6-digit PIN. The PIN is single-use and 
 
 How it works on the projector:
 - `RemoteService` (foreground) owns everything and restarts on boot.
-- It speaks the ADB protocol to the projector's own adbd on `127.0.0.1:3333` (root, no auth on this userdebug build) to launch `app_process … io.egate.remote.injector.Main --uid <app uid>`. That helper injects input through `InputManager.injectInputEvent` and only accepts connections from the receiver app's uid. If the helper dies, the next command respawns it.
+- It speaks the ADB protocol to the projector's own adbd on `127.0.0.1:3333` (root, no auth on this userdebug build) and uses the `exec:` service to launch `nohup setsid … app_process … io.egate.remote.injector.Main --uid <app uid>` (the `shell:` service would kill the child when the stream closes). The helper injects keys and text through `InputManager.injectInputEvent`, drives the pointer by writing evdev events to the vendor `jixin_mouse` device so Android draws a real cursor, and only accepts connections from the receiver app's uid. If the helper dies, the next command respawns it; its stderr is in `/data/local/tmp/egate-injector.log`.
 - Wi-Fi: `ws://<ip>:7272/`, mDNS `_egate-remote._tcp` as "EGate Atom3X", app icons at `http://<ip>:7273/icon/<pkg>`.
 - BLE: advertises as "EGate Remote" with service `b6517522-6d7b-49d2-8488-664819daea01`.
 

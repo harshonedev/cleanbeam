@@ -7,71 +7,125 @@ import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.OvershootInterpolator
+import android.view.animation.PathInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 class AppAdapter(
     private var items: List<AppInfo>,
-    private var accent: Int,
-    private var appGlow: Boolean,
-    private var namesFocusedOnly: Boolean,
     private val onClick: (AppInfo) -> Unit,
-    private val onLongClick: (AppInfo) -> Unit
+    private val onLongClick: (AppInfo) -> Unit,
+    private val onFocus: (AppInfo) -> Unit
 ) : RecyclerView.Adapter<AppAdapter.VH>() {
+
+    /** Set before the first submit so the cards slide in once; cleared after the first layout. */
+    var entrance = false
+    private val overshoot = OvershootInterpolator(1.6f)
+    private val settle = PathInterpolator(0.2f, 0f, 0f, 1f)
 
     class VH(view: View) : RecyclerView.ViewHolder(view) {
         val card: View = view.findViewById(R.id.card)
+        val banner: ImageView = view.findViewById(R.id.banner)
+        val fallback: View = view.findViewById(R.id.fallback)
         val icon: ImageView = view.findViewById(R.id.icon)
         val label: TextView = view.findViewById(R.id.label)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.item_app, parent, false)
-        return VH(v)
+        val vh = VH(v)
+        vh.card.clipToOutline = true
+        vh.card.foreground = focusRing(vh.card)
+        return vh
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val app = items[position]
-        val glow = if (appGlow) app.color else accent
-        holder.icon.setImageDrawable(app.icon)
-        holder.label.text = app.label
-        holder.card.background = buildBackground(holder.card, glow)
-        holder.label.alpha = if (namesFocusedOnly) 0f else 1f
-        holder.card.setOnClickListener { onClick(app) }
-        holder.card.setOnLongClickListener { onLongClick(app); true }
-        holder.card.setOnFocusChangeListener { v, hasFocus ->
-            val scale = if (hasFocus) 1.14f else 1.0f
-            v.animate().scaleX(scale).scaleY(scale).setDuration(130).start()
-            v.elevation = if (hasFocus) dp(v, 10f) else 0f
-            holder.label.isSelected = hasFocus
-            if (namesFocusedOnly) holder.label.animate().alpha(if (hasFocus) 1f else 0f).setDuration(130).start()
+        val card = holder.card
+        if (app.banner != null) {
+            holder.banner.setImageDrawable(app.banner)
+            holder.banner.visibility = View.VISIBLE
+            holder.fallback.visibility = View.GONE
+        } else {
+            holder.banner.setImageDrawable(null)
+            holder.banner.visibility = View.GONE
+            holder.fallback.visibility = View.VISIBLE
+            holder.fallback.background = fallbackArt(card, app.color)
+            holder.icon.setImageDrawable(app.icon)
+            holder.label.text = app.label
         }
+        card.outlineSpotShadowColor = app.color
+        card.outlineAmbientShadowColor = app.color
+        card.contentDescription = app.label
+
+        card.setOnClickListener { onClick(app) }
+        card.setOnLongClickListener { onLongClick(app); true }
+        card.setOnFocusChangeListener { v, hasFocus ->
+            val scale = if (hasFocus) 1.12f else 1.0f
+            v.animate().cancel()
+            v.animate().scaleX(scale).scaleY(scale)
+                .setDuration(if (hasFocus) 320 else 200)
+                .setInterpolator(if (hasFocus) overshoot else settle)
+                .start()
+            v.elevation = if (hasFocus) dp(v, 14f) else dp(v, 2f)
+            if (hasFocus) onFocus(app)
+        }
+
+        if (entrance && position < 7) {
+            card.alpha = 0f
+            card.translationX = dp(card, 56f)
+            card.animate().alpha(1f).translationX(0f)
+                .setStartDelay(60L + position * 55L).setDuration(420)
+                .setInterpolator(settle).start()
+        } else {
+            card.alpha = 1f
+            card.translationX = 0f
+        }
+    }
+
+    override fun onViewRecycled(holder: VH) {
+        holder.card.animate().cancel()
+        holder.card.scaleX = 1f; holder.card.scaleY = 1f
+        holder.card.alpha = 1f; holder.card.translationX = 0f
     }
 
     override fun getItemCount(): Int = items.size
 
-    fun submit(newItems: List<AppInfo>) { items = newItems; notifyDataSetChanged() }
+    fun item(position: Int): AppInfo? = items.getOrNull(position)
 
-    fun setStyle(accent: Int, appGlow: Boolean, namesFocusedOnly: Boolean) {
-        this.accent = accent; this.appGlow = appGlow; this.namesFocusedOnly = namesFocusedOnly
-        notifyDataSetChanged()
-    }
+    fun submit(newItems: List<AppInfo>) { items = newItems; notifyDataSetChanged() }
 
     private fun dp(v: View, value: Float): Float =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, v.resources.displayMetrics)
 
-    private fun buildBackground(v: View, glow: Int): StateListDrawable {
-        val radius = dp(v, 16f)
-        val normal = GradientDrawable().apply { cornerRadius = radius; setColor(Color.parseColor("#1E2438")) }
+    private fun focusRing(v: View): StateListDrawable {
+        val radius = dp(v, 14f)
         val focused = GradientDrawable().apply {
             cornerRadius = radius
-            setColor(Color.argb(0x3A, Color.red(glow), Color.green(glow), Color.blue(glow)))
-            setStroke(dp(v, 2.5f).toInt(), glow)
+            setColor(Color.TRANSPARENT)
+            setStroke(dp(v, 3f).toInt(), Color.WHITE)
+        }
+        val normal = GradientDrawable().apply {
+            cornerRadius = radius
+            setColor(Color.TRANSPARENT)
+            setStroke(dp(v, 1f).toInt(), 0x22FFFFFF)
         }
         return StateListDrawable().apply {
             addState(intArrayOf(android.R.attr.state_focused), focused)
             addState(intArrayOf(), normal)
         }
+    }
+
+    /** Apps without a banner get a diagonal wash of their own color, dark enough for the label. */
+    private fun fallbackArt(v: View, color: Int): GradientDrawable {
+        val hsv = FloatArray(3); Color.colorToHSV(color, hsv)
+        hsv[2] = (hsv[2] * 0.55f).coerceAtLeast(0.18f); hsv[1] = (hsv[1] * 0.9f)
+        val deep = Color.HSVToColor(hsv)
+        return GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(deep, 0xFF131727.toInt())
+        ).apply { cornerRadius = dp(v, 14f) }
     }
 }

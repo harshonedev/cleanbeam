@@ -122,3 +122,9 @@ e-gate/
 - adbd: root, listening on :3333 after it restarts (`ro.secure=0`, `persist.adb.tcp.port=3333`); it also restarted by itself after a suspend/resume cycle. A true cold-boot check is still pending (plan Task 10 Step 4).
 - Sleep: `KEYCODE_SLEEP` and the IR power menu's "Screen Off" both suspend the SoC: Wi-Fi off, adbd gone, WoL ignored. **Wake from the phone is impossible**; the phone UI hides "wake". Idle screen-off timeout on the box is 5 min, so the projector disappears from the network after 5 idle minutes.
 - Projector keys: IR power button = keycode 135 (opens power menu); see `remote/PROTOCOL.md` for the full table. Focus/keystone are not Android keys on this box.
+
+## Build status (2026-10-23 02:00, verified on hardware)
+- Receiver installed on the projector; helper spawns as root via the adbd `exec:` service and survives the stream close (`shell:` killed it). Pointer uses the vendor evdev mouse (`/dev/input/event6`, `jixin_mouse`) because injected SOURCE_MOUSE events draw no cursor.
+- Wi-Fi: mDNS resolvable from Mac and phone, auth/ping/status/apps/launch/icons/text/mouse all verified with `tools/wsctl.mjs`; PIN pairing verified (wrong PIN → `pair_fail`, right PIN → `pair_ok`, reuse → `pair_fail`).
+- Phone (OPPO Reno3 Pro, Android 12): paired by QR, D-pad/Apps/Touchpad/keyboard used live; with Wi-Fi off the app fell back to BLE within ~15 s (badge "Bluetooth", key presses and status pushes flow).
+- Known gaps: emoji/non-ASCII text is lost (needs clipboard paste); keys held when a phone drops are not released; ws reconnect does not offer re-pair on `auth_fail`.
