@@ -70,6 +70,7 @@ class LauncherActivity : AppCompatActivity() {
     private var tintDrawable = GradientDrawable()
     private var wallpaperKey = ""
     private var firstLoad = true
+    private var heroGen = 0              // bumps per hero change so a cancelled fade can't leave it hidden
 
     private val io = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
@@ -124,8 +125,9 @@ class LauncherActivity : AppCompatActivity() {
         row.adapter = adapter
         row.itemAnimator = null
 
-        hero.alpha = 0f
         heroTitle.text = getString(R.string.loading)
+        heroSubtitle.text = ""; heroMeta.visibility = View.GONE
+        row.upTarget = tabApps
         underline.post { moveUnderline(tabApps, animate = false) }
 
         reloadApps()
@@ -235,6 +237,7 @@ class LauncherActivity : AppCompatActivity() {
     private fun selectTab(t: Tab) {
         if (tab == t) { paintTabs(); return }
         tab = t
+        row.upTarget = currentTabView()
         paintTabs()
         populateRow(animate = true)
     }
@@ -329,9 +332,11 @@ class LauncherActivity : AppCompatActivity() {
     // ---------- apps ----------
     private fun reloadApps() {
         io.execute {
+            val t0 = System.currentTimeMillis()
             val apps = runCatching { AppRepository.loadApps(this) }
                 .onFailure { Log.e("EGate", "loadApps failed", it) }
                 .getOrDefault(allApps)
+            Log.i("EGate", "loaded ${apps.size} apps in ${System.currentTimeMillis() - t0}ms")
             handler.post {
                 allApps = apps
                 populateRow(animate = firstLoad)
@@ -382,10 +387,10 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun renderHero(app: AppInfo, animate: Boolean) {
-        val subtitle = buildString {
-            append(app.category?.let { "$it app" } ?: "App")
-            shortVersion(app.version)?.let { append(", version ").append(it) }
-        }
+        val subtitle = listOfNotNull(
+            app.category?.let { "$it app" },
+            shortVersion(app.version)?.let { "version $it" }
+        ).joinToString(", ").replaceFirstChar { it.uppercase() }
         val meta = when {
             app.lastUsed > 0 -> {
                 val rel = relative(app.lastUsed, DateUtils.MINUTE_IN_MILLIS)
@@ -402,10 +407,12 @@ class LauncherActivity : AppCompatActivity() {
             heroMeta.text = meta
             heroMeta.visibility = if (meta.isEmpty()) View.GONE else View.VISIBLE
         }
-        if (!animate) { apply(); hero.alpha = 1f }
+        val gen = ++heroGen
+        if (!animate) { apply(); hero.alpha = 1f; hero.translationY = 0f }
         else {
             hero.animate().cancel()
             hero.animate().alpha(0f).translationY(6f).setDuration(110).withEndAction {
+                if (gen != heroGen) return@withEndAction
                 apply()
                 hero.translationY = 14f
                 hero.animate().alpha(1f).translationY(0f).setDuration(320).setInterpolator(ease).start()
