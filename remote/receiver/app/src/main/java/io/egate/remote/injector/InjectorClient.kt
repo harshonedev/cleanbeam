@@ -58,15 +58,20 @@ class InjectorClient(
 
     companion object {
         private const val TAG = "EGateRemote"
+        private const val UID_ROOT = 0
+        private const val UID_SHELL = 2000
+
+        /** The helper is spawned by adbd, so it runs as root or shell; anything else is a squatter. */
+        fun isTrustedHelperUid(uid: Int): Boolean = uid == UID_ROOT || uid == UID_SHELL
 
         /** Production wiring: spawn via adbd on localhost, connect via abstract LocalSocket. */
-        fun create(apkPath: String): InjectorClient {
+        fun create(apkPath: String, appUid: Int): InjectorClient {
             val spawner = object : Spawner {
                 override fun spawn() {
                     try {
                         AdbClient().use {
                             it.connect()
-                            it.shellDetached("CLASSPATH=$apkPath app_process /system/bin io.egate.remote.injector.Main")
+                            it.shellDetached("CLASSPATH=$apkPath app_process /system/bin io.egate.remote.injector.Main --uid $appUid")
                             Thread.sleep(300) // let adbd actually fork before the socket closes
                         }
                     } catch (e: Exception) {
@@ -78,7 +83,12 @@ class InjectorClient(
                 override fun connect(): LineChannel? = try {
                     val s = LocalSocket()
                     s.connect(LocalSocketAddress(Main.SOCKET_NAME, LocalSocketAddress.Namespace.ABSTRACT))
-                    LocalLineChannel(s)
+                    val peer = s.peerCredentials.uid
+                    if (!isTrustedHelperUid(peer)) {
+                        Log.w(TAG, "injector socket owned by untrusted uid $peer; refusing")
+                        s.close()
+                        null
+                    } else LocalLineChannel(s)
                 } catch (e: IOException) {
                     null
                 }

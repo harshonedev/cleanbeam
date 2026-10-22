@@ -22,7 +22,7 @@ class RemoteService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForeground(NOTIFICATION_ID, buildNotification())
-        injector = InjectorClient.create(applicationInfo.sourceDir)
+        injector = InjectorClient.create(applicationInfo.sourceDir, applicationInfo.uid)
         executor.execute {
             try {
                 Log.i(TAG, "injector hello → " + injector.send("{\"t\":\"hello\"}"))

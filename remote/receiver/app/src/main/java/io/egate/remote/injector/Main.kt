@@ -18,22 +18,50 @@ import java.io.OutputStream
 object Main {
     const val SOCKET_NAME = "egate-injector"
 
+    /**
+     * args: --uid <N>  only accept connections from this uid (the receiver app). Mandatory.
+     *       selftest   inject one DPAD_DOWN at startup (hardware smoke test).
+     */
     @JvmStatic
     fun main(args: Array<String>) {
         if (Looper.myLooper() == null) Looper.prepare()
+        val allowedUid = parseUid(args)
+        if (allowedUid == null) {
+            System.err.println("usage: Main --uid <app uid> [selftest]")
+            System.exit(2)
+            return
+        }
         val sink = AndroidSink()
         val injector = InputInjector(sink, sink)
-        if (args.isNotEmpty() && args[0] == "selftest") {
+        if ("selftest" in args) {
             injector.key(20, io.egate.remote.protocol.KeyAction.TAP)
             System.err.println("selftest: injected DPAD_DOWN")
         }
-        val server = LocalServerSocket(SOCKET_NAME)
-        System.err.println("egate-injector listening pid=${Process.myPid()}")
+        val server = try { LocalServerSocket(SOCKET_NAME) } catch (e: Exception) {
+            System.err.println("egate-injector: cannot bind $SOCKET_NAME (already running?): $e")
+            System.exit(1)
+            return
+        }
+        System.err.println("egate-injector listening pid=${Process.myPid()} allowedUid=$allowedUid")
         while (true) {
             val client = try { server.accept() } catch (e: Exception) { break }
+            val peer = try { client.peerCredentials.uid } catch (e: Exception) { -1 }
+            if (!isAllowedPeer(peer, allowedUid)) {
+                System.err.println("egate-injector: rejected connection from uid $peer")
+                try { client.close() } catch (_: Exception) {}
+                continue
+            }
             serve(client, injector)
         }
     }
+
+    internal fun parseUid(args: Array<String>): Int? {
+        val i = args.indexOf("--uid")
+        if (i < 0 || i + 1 >= args.size) return null
+        return args[i + 1].toIntOrNull()
+    }
+
+    internal fun isAllowedPeer(peerUid: Int, allowedUid: Int): Boolean = peerUid == allowedUid
 
     private fun serve(client: LocalSocket, injector: InputInjector) {
         try {
