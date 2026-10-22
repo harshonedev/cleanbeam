@@ -50,7 +50,7 @@ class CommandRouter(
         private var badAttempts = 0
 
         /** Transports call this when the underlying link goes away. */
-        fun onClosed() { status.onClosed(session.label) }
+        fun onClosed() { if (authenticated) { authenticated = false; status.onClosed(session.label) } }
 
         fun onMessage(json: String) {
             val cmd = Codec.decodeCommand(json)

@@ -47,6 +47,30 @@ class ConnectionStatusTest {
     }
 
     @Test
+    fun `an unauthenticated connection closing does not clear an authenticated one with the same label`() {
+        val a = router.newConnection(LabelledSession("Wi-Fi 192.168.10.44"))
+        a.onMessage("""{"t":"auth","token":"TOKEN"}""")
+        val b = router.newConnection(LabelledSession("Wi-Fi 192.168.10.44"))
+        b.onMessage("""{"t":"auth","token":"wrong"}""")
+        b.onClosed()
+        assertEquals(listOf("Wi-Fi 192.168.10.44"), status.clients())
+        a.onClosed()
+        assertEquals(emptyList<String>(), status.clients())
+    }
+
+    @Test
+    fun `two authenticated connections with one label stay listed until both close`() {
+        val a = router.newConnection(LabelledSession("Bluetooth X"))
+        val b = router.newConnection(LabelledSession("Bluetooth X"))
+        a.onMessage("""{"t":"auth","token":"TOKEN"}""")
+        b.onMessage("""{"t":"auth","token":"TOKEN"}""")
+        a.onClosed()
+        assertEquals(listOf("Bluetooth X"), status.clients())
+        b.onClosed()
+        assertEquals(emptyList<String>(), status.clients())
+    }
+
+    @Test
     fun `summary text reads naturally`() {
         assertEquals("No phone connected", status.summary())
         status.bluetooth = "advertising"

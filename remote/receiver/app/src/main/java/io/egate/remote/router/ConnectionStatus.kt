@@ -5,15 +5,19 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /** What the projector's pairing screen shows: who is connected and over which link. */
 class ConnectionStatus {
-    private val authenticated = ConcurrentHashMap<String, Long>()
+    /** label → number of authenticated connections carrying it. */
+    private val authenticated = ConcurrentHashMap<String, Int>()
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
 
     /** "off", "advertising" or "unavailable". */
     @Volatile var bluetooth: String = "off"
         set(value) { field = value; notifyListeners() }
 
-    fun onAuthenticated(label: String) { authenticated[label] = System.currentTimeMillis(); notifyListeners() }
-    fun onClosed(label: String) { if (authenticated.remove(label) != null) notifyListeners() }
+    fun onAuthenticated(label: String) { authenticated.merge(label, 1, Int::plus); notifyListeners() }
+    fun onClosed(label: String) {
+        val removed = authenticated.computeIfPresent(label) { _, n -> if (n <= 1) null else n - 1 } == null && !authenticated.containsKey(label)
+        if (removed) notifyListeners()
+    }
 
     fun clients(): List<String> = authenticated.keys.sorted()
 
