@@ -119,7 +119,7 @@ e-gate/
 
 ---
 ## Verified on hardware (2026-10-23)
-- adbd: root, listening on :3333 after it restarts (`ro.secure=0`, `persist.adb.tcp.port=3333`); it also restarted by itself after a suspend/resume cycle. A true cold-boot check is still pending (plan Task 10 Step 4).
+- adbd: listening on :3333 at cold boot, but as **uid 2000 (shell)** until someone runs `adb root`; `ro.secure=0` only means `adb root` is allowed. The helper therefore runs as shell after a reboot, which is enough: shell holds INJECT_EVENTS and is in the `input` group (evdev pointer still works). Only `power reboot` needs root and silently fails then (the on-screen power menu has Reboot). Verified 2026-10-23 02:24 after a cold boot: service, WebSocket, mDNS, BLE advertising and helper all up with no ADB interaction.
 - Sleep: `KEYCODE_SLEEP` and the IR power menu's "Screen Off" both suspend the SoC: Wi-Fi off, adbd gone, WoL ignored. **Wake from the phone is impossible**; the phone UI hides "wake". Idle screen-off timeout on the box is 5 min, so the projector disappears from the network after 5 idle minutes.
 - Projector keys: IR power button = keycode 135 (opens power menu); see `remote/PROTOCOL.md` for the full table. Focus/keystone are not Android keys on this box.
 
