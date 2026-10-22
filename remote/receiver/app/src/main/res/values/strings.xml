@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">EGate Remote</string>
+    <string name="pairing_title">Remote pairing</string>
+    <string name="notification_title">EGate Remote running</string>
+    <string name="notification_text">Phone remote control is active</string>
+    <string name="pairing_hint">Scan with the EGate Remote app, or enter this code</string>
+    <string name="repair">Re-pair (new token)</string>
+</resources>
