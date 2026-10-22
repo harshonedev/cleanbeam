@@ -12,9 +12,8 @@ Future<bool> ensureBlePermissions() async {
     // Android 12+ grants the two bluetooth permissions; older versions report them as granted and need location.
     return (scan?.isGranted ?? false) && (connect?.isGranted ?? false) || (results[Permission.locationWhenInUse]?.isGranted ?? false);
   }
-  if (Platform.isIOS) {
-    return (await Permission.bluetooth.request()).isGranted;
-  }
+  // iOS: CoreBluetooth shows its own prompt the first time a scan starts; permission_handler's
+  // Bluetooth group is not compiled in, so asking it would report "denied" straight away.
   return true;
 }
 
