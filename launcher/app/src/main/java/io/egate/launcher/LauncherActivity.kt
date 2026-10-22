@@ -96,6 +96,8 @@ class LauncherActivity : AppCompatActivity() {
 
         applyBackground(force = true)
         reloadApps()
+
+        if (prefs.keepAwake) KeepAliveService.start(this)
     }
 
     override fun onResume() {
@@ -109,6 +111,21 @@ class LauncherActivity : AppCompatActivity() {
             addDataScheme("package")
         })
         reloadApps()
+        ensureScreensaver()
+    }
+
+    /** Vendor apps (jixin settings) re-point the screensaver on boot; reassert ours. */
+    private fun ensureScreensaver() {
+        val want = "io.egate.launcher/.ClockDreamService"
+        try {
+            val cur = Settings.Secure.getString(contentResolver, "screensaver_components")
+            if (cur != want) {
+                Settings.Secure.putString(contentResolver, "screensaver_components", want)
+                Settings.Secure.putInt(contentResolver, "screensaver_enabled", 1)
+            }
+        } catch (e: SecurityException) {
+            // WRITE_SECURE_SETTINGS not granted; granted once via adb.
+        }
     }
 
     override fun onPause() {

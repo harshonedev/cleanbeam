@@ -116,4 +116,13 @@ The phone identifies the projector over BLE by the service UUID (Android apps ca
 
 ## Projector-specific keys ("Extra" row)
 
-To be filled from `/system/usr/keylayout` + `/vendor/usr/keylayout` on the device (plan Task 1, Step 4). None recorded yet.
+Measured on the device (2026-10-23) by injecting each keycode the IR keypad (`ir_keypad`, `/dev/input/event0`) can emit:
+
+| Keycode | IR button | Effect | Phone UI |
+|---------|-----------|--------|----------|
+| 135 (F5) | Power | Opens the projector power menu: Reboot / Screen Off / Power Off (auto power-off after 20 s) / Timing Switch Off | **"Power menu"** button in the Extra row |
+| 131 (F1), 140 (F10) | unknown | No visible effect on the launcher | not exposed |
+| 137 (F7) | hidden | Opens `com.jixin.factorytest` | not exposed |
+| 139 (F9) | hidden | Opens Android TV developer options | not exposed |
+
+Power facts: both `KEYCODE_SLEEP` (223) and the menu's "Screen Off" put the box into full suspend: Wi-Fi drops, adbd dies, Wake-on-LAN magic packets are ignored. Nothing the phone sends can wake it. The phone therefore shows no "wake" button; `power wake` stays in the protocol for a future firmware that keeps radios on.
