@@ -67,6 +67,40 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("names_focus", false)
         set(v) = sp.edit().putBoolean("names_focus", v).apply()
 
+    var wallpaper: Boolean
+        get() = sp.getBoolean("wallpaper", false)
+        set(v) = sp.edit().putBoolean("wallpaper", v).apply()
+
+    var wallpaperDim: Int
+        get() = sp.getInt("wallpaper_dim", 40).coerceIn(0, 80)
+        set(v) = sp.edit().putInt("wallpaper_dim", v.coerceIn(0, 80)).apply()
+
+    // ----- remote shortcuts (keycode -> package) -----
+    fun shortcuts(): LinkedHashMap<Int, String> {
+        val raw = sp.getString("shortcuts", "") ?: ""
+        val map = LinkedHashMap<Int, String>()
+        if (raw.isEmpty()) return map
+        for (part in raw.split(";")) {
+            if (part.isBlank()) continue
+            val kv = part.split(":", limit = 2)
+            val code = kv[0].toIntOrNull() ?: continue
+            if (kv.size == 2 && kv[1].isNotBlank()) map[code] = kv[1]
+        }
+        return map
+    }
+
+    private fun saveShortcuts(map: Map<Int, String>) {
+        sp.edit().putString("shortcuts", map.entries.joinToString(";") { "${it.key}:${it.value}" }).apply()
+    }
+
+    fun setShortcut(keyCode: Int, pkg: String) {
+        val m = shortcuts(); m[keyCode] = pkg; saveShortcuts(m)
+    }
+
+    fun removeShortcut(keyCode: Int) {
+        val m = shortcuts(); m.remove(keyCode); saveShortcuts(m)
+    }
+
     // ----- favorites (ordered list of package names) -----
     fun favorites(): MutableList<String> {
         val raw = sp.getString("favorites", "") ?: ""
