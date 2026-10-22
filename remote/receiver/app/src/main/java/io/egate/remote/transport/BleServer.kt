@@ -22,6 +22,7 @@ import android.os.ParcelUuid
 import android.util.Log
 import io.egate.remote.protocol.Chunker
 import io.egate.remote.router.CommandRouter
+import io.egate.remote.router.ConnectionStatus
 import io.egate.remote.router.Session
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -29,7 +30,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 /** BLE transport: GATT server with a write characteristic (cmd) and a notify characteristic (evt). */
-class BleServer(private val ctx: Context, private val router: CommandRouter) {
+class BleServer(private val ctx: Context, private val router: CommandRouter, private val status: ConnectionStatus? = null) {
 
     private val manager = ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private var gatt: BluetoothGattServer? = null
@@ -43,6 +44,7 @@ class BleServer(private val ctx: Context, private val router: CommandRouter) {
         val outbox = LinkedBlockingQueue<ByteArray>()
         val sentAck = LinkedBlockingQueue<Boolean>(1)
         val connection: CommandRouter.Connection = router.newConnection(object : Session {
+            override val label = "Bluetooth " + device.address
             override fun send(json: String) { enqueue(json.toByteArray()) }
             override fun close() { gatt?.cancelConnection(device) }
         })
@@ -117,6 +119,7 @@ class BleServer(private val ctx: Context, private val router: CommandRouter) {
     }
 
     private fun closeGatt() {
+        status?.bluetooth = "off"
         try { advertiser?.stopAdvertising(adCallback) } catch (_: Exception) {}
         try { gatt?.close() } catch (_: Exception) {}
         gatt = null
@@ -167,8 +170,11 @@ class BleServer(private val ctx: Context, private val router: CommandRouter) {
     }
 
     private val adCallback = object : AdvertiseCallback() {
-        override fun onStartSuccess(s: AdvertiseSettings) { Log.i(TAG, "ble advertising as $LOCAL_NAME") }
-        override fun onStartFailure(code: Int) { Log.w(TAG, "ble advertising failed: $code") }
+        override fun onStartSuccess(s: AdvertiseSettings) { Log.i(TAG, "ble advertising as $LOCAL_NAME"); status?.bluetooth = "advertising" }
+        override fun onStartFailure(code: Int) {
+            Log.w(TAG, "ble advertising failed: $code")
+            status?.bluetooth = if (code == AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED) "advertising" else "unavailable"
+        }
     }
 
     private val callback = object : BluetoothGattServerCallback() {
@@ -177,7 +183,7 @@ class BleServer(private val ctx: Context, private val router: CommandRouter) {
                 clients[device.address] = Client(device)
                 Log.i(TAG, "ble connected ${device.address}")
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                clients.remove(device.address)
+                clients.remove(device.address)?.connection?.onClosed()
                 Log.i(TAG, "ble disconnected ${device.address}")
                 startAdvertising()
             }

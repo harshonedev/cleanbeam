@@ -7,6 +7,8 @@ import io.egate.remote.protocol.Event
 
 /** One connected phone, regardless of transport. */
 interface Session {
+    /** Human-readable link description shown on the projector, e.g. "Wi-Fi 192.168.10.44". */
+    val label: String
     fun send(json: String)
     fun close()
 }
@@ -35,13 +37,20 @@ class CommandRouter(
     private val apps: AppsProvider,
     private val deviceName: String,
     private val version: String,
+    private val status: ConnectionStatus = ConnectionStatus(),
 ) {
     fun newConnection(session: Session) = Connection(session)
 
     inner class Connection(private val session: Session) {
         @Volatile var authenticated = false
-            private set
+            private set(value) {
+                field = value
+                if (value) status.onAuthenticated(session.label)
+            }
         private var badAttempts = 0
+
+        /** Transports call this when the underlying link goes away. */
+        fun onClosed() { status.onClosed(session.label) }
 
         fun onMessage(json: String) {
             val cmd = Codec.decodeCommand(json)

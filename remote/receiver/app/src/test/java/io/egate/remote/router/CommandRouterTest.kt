@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private class FakeSession : Session {
+    override val label = "test"
     val sent = mutableListOf<String>()
     var closed = false
     override fun send(json: String) { sent += json }

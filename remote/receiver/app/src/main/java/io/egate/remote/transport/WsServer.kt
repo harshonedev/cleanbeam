@@ -70,6 +70,7 @@ class WsServer(
     private inner class Server(addr: InetSocketAddress) : WebSocketServer(addr) {
         override fun onOpen(conn: WebSocket, handshake: ClientHandshake) {
             val session = object : Session {
+                override val label = "Wi-Fi " + (conn.remoteSocketAddress?.address?.hostAddress ?: "?")
                 override fun send(json: String) { if (conn.isOpen) conn.send(json) }
                 override fun close() { conn.close(1008, "auth") }
             }
@@ -77,6 +78,7 @@ class WsServer(
             Log.i(TAG, "ws open from ${conn.remoteSocketAddress}")
         }
         override fun onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean) {
+            conn.getAttachment<CommandRouter.Connection>()?.onClosed()
             Log.i(TAG, "ws closed ${conn.remoteSocketAddress} ($code)")
         }
         override fun onMessage(conn: WebSocket, message: String) {

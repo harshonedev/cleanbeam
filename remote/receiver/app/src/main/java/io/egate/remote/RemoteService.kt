@@ -13,6 +13,7 @@ import io.egate.remote.adb.AdbClient
 import io.egate.remote.injector.InjectorClient
 import io.egate.remote.router.AppsHandler
 import io.egate.remote.router.CommandRouter
+import io.egate.remote.router.ConnectionStatus
 import io.egate.remote.transport.BleServer
 import io.egate.remote.transport.WsServer
 import java.util.concurrent.Executors
@@ -45,9 +46,9 @@ class RemoteService : Service() {
         val store = PairingStore.get(this)
         apps = AppsHandler(this)
         val version = packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
-        router = CommandRouter(store, { json -> injector.send(json) }, apps, WsServer.SERVICE_NAME, version)
+        router = CommandRouter(store, { json -> injector.send(json) }, apps, WsServer.SERVICE_NAME, version, status)
         ws = WsServer(this, router, apps).also { runCatching { it.start() }.onFailure { e -> Log.e(TAG, "ws start failed", e) } }
-        ble = BleServer(this, router).also { runCatching { it.start() }.onFailure { e -> Log.e(TAG, "ble start failed", e) } }
+        ble = BleServer(this, router, status).also { runCatching { it.start() }.onFailure { e -> Log.e(TAG, "ble start failed", e) } }
         scheduler.scheduleWithFixedDelay({ pushStatusIfChanged() }, 2, 2, TimeUnit.SECONDS)
         Log.i(TAG, "RemoteService created")
     }
@@ -118,10 +119,14 @@ class RemoteService : Service() {
         const val TAG = "EGateRemote"
         const val ACTION_DEBUG_SHELL = "io.egate.remote.DEBUG_SHELL"
         const val ACTION_DEBUG_INJECT = "io.egate.remote.DEBUG_INJECT"
+
+        /** Live connection state for the pairing screen. */
+        val status = ConnectionStatus()
         private const val CHANNEL_ID = "egate_remote"
         private const val NOTIFICATION_ID = 1
 
         private val NOOP_SESSION = object : io.egate.remote.router.Session {
+            override val label = "internal"
             override fun send(json: String) {}
             override fun close() {}
         }

@@ -22,6 +22,8 @@ class PairingActivity : AppCompatActivity() {
     private lateinit var qr: ImageView
     private lateinit var pin: TextView
     private lateinit var ip: TextView
+    private lateinit var status: TextView
+    private val statusListener: () -> Unit = { runOnUiThread { renderStatus() } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,6 +33,7 @@ class PairingActivity : AppCompatActivity() {
         qr = findViewById(R.id.qr)
         pin = findViewById(R.id.pin)
         ip = findViewById(R.id.ip)
+        status = findViewById(R.id.status)
         findViewById<Button>(R.id.repair).setOnClickListener {
             store.regenerate()
             render()
@@ -42,11 +45,24 @@ class PairingActivity : AppCompatActivity() {
         super.onResume()
         store.newPin()
         render()
+        RemoteService.status.addListener(statusListener)
+        renderStatus()
     }
 
     override fun onPause() {
+        RemoteService.status.removeListener(statusListener)
         store.clearPin()
         super.onPause()
+    }
+
+    private fun renderStatus() {
+        val st = RemoteService.status
+        val bt = when (st.bluetooth) {
+            "advertising" -> "Bluetooth ready"
+            "unavailable" -> "Bluetooth unavailable"
+            else -> "Bluetooth off"
+        }
+        status.text = st.summary() + "  ·  " + bt
     }
 
     private fun render() {
