@@ -47,6 +47,26 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("bigclock", true)
         set(v) = sp.edit().putBoolean("bigclock", v).apply()
 
+    var appGlow: Boolean
+        get() = sp.getBoolean("appglow", true)
+        set(v) = sp.edit().putBoolean("appglow", v).apply()
+
+    var ambientSky: Boolean
+        get() = sp.getBoolean("sky", true)
+        set(v) = sp.edit().putBoolean("sky", v).apply()
+
+    var greeting: Boolean
+        get() = sp.getBoolean("greeting", true)
+        set(v) = sp.edit().putBoolean("greeting", v).apply()
+
+    var showStats: Boolean
+        get() = sp.getBoolean("stats", false)
+        set(v) = sp.edit().putBoolean("stats", v).apply()
+
+    var namesFocusedOnly: Boolean
+        get() = sp.getBoolean("names_focus", false)
+        set(v) = sp.edit().putBoolean("names_focus", v).apply()
+
     // ----- favorites (ordered list of package names) -----
     fun favorites(): MutableList<String> {
         val raw = sp.getString("favorites", "") ?: ""

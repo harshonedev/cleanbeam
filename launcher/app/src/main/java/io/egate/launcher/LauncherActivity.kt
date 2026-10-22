@@ -1,5 +1,6 @@
 package io.egate.launcher
 
+import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -10,8 +11,10 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.StatFs
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.View
@@ -28,8 +31,11 @@ import java.util.Locale
 class LauncherActivity : AppCompatActivity() {
 
     private lateinit var prefs: Prefs
+    private lateinit var root: View
+    private lateinit var greeting: TextView
     private lateinit var clock: TextView
     private lateinit var dateText: TextView
+    private lateinit var stats: TextView
     private lateinit var favHeader: TextView
     private lateinit var favGrid: RecyclerView
     private lateinit var grid: RecyclerView
@@ -37,6 +43,7 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var favAdapter: AppAdapter
 
     private var allApps: List<AppInfo> = emptyList()
+    private var lastHour = -1
 
     private val handler = Handler(Looper.getMainLooper())
     private val dateFmt = SimpleDateFormat("EEEE, d MMM", Locale.getDefault())
@@ -56,8 +63,11 @@ class LauncherActivity : AppCompatActivity() {
         prefs = Prefs(this)
         setContentView(R.layout.activity_launcher)
 
+        root = findViewById(R.id.root)
+        greeting = findViewById(R.id.greeting)
         clock = findViewById(R.id.clock)
         dateText = findViewById(R.id.date)
+        stats = findViewById(R.id.stats)
         favHeader = findViewById(R.id.fav_header)
         favGrid = findViewById(R.id.fav_grid)
         grid = findViewById(R.id.grid)
@@ -66,9 +76,10 @@ class LauncherActivity : AppCompatActivity() {
         setupPill(findViewById(R.id.btn_wifi)) { safeStart(Intent(Settings.ACTION_WIFI_SETTINGS)) }
         setupPill(findViewById(R.id.btn_settings)) { safeStart(Intent(Settings.ACTION_SETTINGS)) }
 
-        val accent = prefs.accentColor
-        favAdapter = AppAdapter(emptyList(), accent, onClick = { launchApp(it) }, onLongClick = { appMenu(it) })
-        gridAdapter = AppAdapter(emptyList(), accent, onClick = { launchApp(it) }, onLongClick = { appMenu(it) })
+        favAdapter = AppAdapter(emptyList(), prefs.accentColor, prefs.appGlow, prefs.namesFocusedOnly,
+            onClick = { launchApp(it) }, onLongClick = { appMenu(it) })
+        gridAdapter = AppAdapter(emptyList(), prefs.accentColor, prefs.appGlow, prefs.namesFocusedOnly,
+            onClick = { launchApp(it) }, onLongClick = { appMenu(it) })
 
         favGrid.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         favGrid.adapter = favAdapter
@@ -76,6 +87,7 @@ class LauncherActivity : AppCompatActivity() {
         grid.adapter = gridAdapter
         grid.setHasFixedSize(true)
 
+        applySky(force = true)
         reloadApps()
     }
 
@@ -99,14 +111,10 @@ class LauncherActivity : AppCompatActivity() {
         runCatching { unregisterReceiver(packageReceiver) }
     }
 
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        grid.scrollToPosition(0)
-    }
-
+    override fun onNewIntent(intent: Intent?) { super.onNewIntent(intent); grid.scrollToPosition(0) }
     override fun onBackPressed() { /* home: swallow */ }
 
-    // ---------- clock ----------
+    // ---------- clock / greeting / stats / sky ----------
     private fun updateClock() {
         val now = Date()
         val pattern = buildString {
@@ -117,6 +125,30 @@ class LauncherActivity : AppCompatActivity() {
         clock.text = SimpleDateFormat(pattern, Locale.getDefault()).format(now)
         clock.textSize = if (prefs.bigClock) 56f else 40f
         dateText.text = dateFmt.format(now)
+
+        greeting.visibility = if (prefs.greeting) View.VISIBLE else View.GONE
+        if (prefs.greeting) greeting.text = Sky.greeting()
+
+        if (prefs.showStats) { stats.visibility = View.VISIBLE; stats.text = statsLine() }
+        else stats.visibility = View.GONE
+
+        applySky(force = false)
+    }
+
+    private fun applySky(force: Boolean) {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        if (!force && hour == lastHour) return
+        lastHour = hour
+        root.background = Sky.drawable(prefs.ambientSky)
+    }
+
+    private fun statsLine(): String {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val mi = ActivityManager.MemoryInfo(); am.getMemoryInfo(mi)
+        val ramFree = mi.availMem / (1024.0 * 1024 * 1024)
+        val fs = StatFs(Environment.getDataDirectory().path)
+        val storFree = fs.availableBytes / (1024.0 * 1024 * 1024)
+        return String.format(Locale.US, "RAM %.1fG free    Storage %.0fG free", ramFree, storFree)
     }
 
     // ---------- apps ----------
@@ -168,6 +200,11 @@ class LauncherActivity : AppCompatActivity() {
         val labels = arrayOf(
             "Accent color: ${Prefs.ACCENTS[prefs.accentIndex].name}",
             "Grid columns: ${prefs.columns}",
+            "Per-app color glow: ${onOff(prefs.appGlow)}",
+            "Ambient sky background: ${onOff(prefs.ambientSky)}",
+            "Greeting: ${onOff(prefs.greeting)}",
+            "System stats line: ${onOff(prefs.showStats)}",
+            "App names: ${if (prefs.namesFocusedOnly) "Focused only" else "Always"}",
             "24-hour clock: ${onOff(prefs.clock24h)}",
             "Show seconds: ${onOff(prefs.showSeconds)}",
             "Large clock: ${onOff(prefs.bigClock)}"
@@ -178,9 +215,14 @@ class LauncherActivity : AppCompatActivity() {
                 when (which) {
                     0 -> pickAccent()
                     1 -> pickColumns()
-                    2 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showOptions() }
-                    3 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showOptions() }
-                    4 -> { prefs.bigClock = !prefs.bigClock; updateClock(); showOptions() }
+                    2 -> { prefs.appGlow = !prefs.appGlow; applyStyle(); showOptions() }
+                    3 -> { prefs.ambientSky = !prefs.ambientSky; applySky(true); showOptions() }
+                    4 -> { prefs.greeting = !prefs.greeting; updateClock(); showOptions() }
+                    5 -> { prefs.showStats = !prefs.showStats; updateClock(); showOptions() }
+                    6 -> { prefs.namesFocusedOnly = !prefs.namesFocusedOnly; applyStyle(); showOptions() }
+                    7 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showOptions() }
+                    8 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showOptions() }
+                    9 -> { prefs.bigClock = !prefs.bigClock; updateClock(); showOptions() }
                 }
             }
             .show()
@@ -188,36 +230,25 @@ class LauncherActivity : AppCompatActivity() {
 
     private fun pickAccent() {
         val names = Prefs.ACCENTS.map { it.name }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Accent color")
+        AlertDialog.Builder(this).setTitle("Accent color")
             .setSingleChoiceItems(names, prefs.accentIndex) { d, i ->
-                prefs.accentIndex = i
-                applyAccent()
-                d.dismiss()
-                showOptions()
-            }
-            .show()
+                prefs.accentIndex = i; applyStyle(); d.dismiss(); showOptions()
+            }.show()
     }
 
     private fun pickColumns() {
         val opts = (Prefs.MIN_COLS..Prefs.MAX_COLS).map { it.toString() }.toTypedArray()
-        val current = prefs.columns - Prefs.MIN_COLS
-        AlertDialog.Builder(this)
-            .setTitle("Grid columns")
-            .setSingleChoiceItems(opts, current) { d, i ->
+        AlertDialog.Builder(this).setTitle("Grid columns")
+            .setSingleChoiceItems(opts, prefs.columns - Prefs.MIN_COLS) { d, i ->
                 prefs.columns = Prefs.MIN_COLS + i
                 (grid.layoutManager as GridLayoutManager).spanCount = prefs.columns
-                gridAdapter.notifyDataSetChanged()
-                d.dismiss()
-                showOptions()
-            }
-            .show()
+                gridAdapter.notifyDataSetChanged(); d.dismiss(); showOptions()
+            }.show()
     }
 
-    private fun applyAccent() {
-        val a = prefs.accentColor
-        gridAdapter.setAccent(a)
-        favAdapter.setAccent(a)
+    private fun applyStyle() {
+        gridAdapter.setStyle(prefs.accentColor, prefs.appGlow, prefs.namesFocusedOnly)
+        favAdapter.setStyle(prefs.accentColor, prefs.appGlow, prefs.namesFocusedOnly)
         setupPillBg(findViewById(R.id.btn_options))
         setupPillBg(findViewById(R.id.btn_wifi))
         setupPillBg(findViewById(R.id.btn_settings))
@@ -254,7 +285,6 @@ class LauncherActivity : AppCompatActivity() {
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics)
 
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
-
     private fun safeStart(intent: Intent) {
         runCatching { startActivity(intent) }.onFailure { toast("Not available") }
     }
