@@ -17,10 +17,14 @@ class WsTransport implements Transport {
   final Duration timeout;
   final Duration pingInterval;
 
+  /// With no inbound frame for this long the link is treated as dead (projector suspended, no FIN).
+  final Duration silenceLimit;
+
   WebSocketChannel? _channel;
   final _events = StreamController<Event>.broadcast();
   final _connected = StreamController<bool>.broadcast();
   Timer? _pingTimer;
+  DateTime _lastInbound = DateTime.now();
   bool _isConnected = false;
   bool _closed = false;
 
@@ -34,6 +38,7 @@ class WsTransport implements Transport {
     this.pairCode,
     this.timeout = const Duration(seconds: 3),
     this.pingInterval = const Duration(seconds: 10),
+    this.silenceLimit = const Duration(seconds: 25),
   }) : assert(token != null || pairCode != null);
 
   @override
@@ -63,6 +68,7 @@ class WsTransport implements Transport {
     _channel = channel;
 
     channel.stream.listen((data) {
+      _lastInbound = DateTime.now();
       final event = parseEvent(data as String);
       if (!authDone.isCompleted) {
         switch (event) {
@@ -98,7 +104,14 @@ class WsTransport implements Transport {
   void _onAuthenticated() {
     _isConnected = true;
     _connected.add(true);
-    _pingTimer = Timer.periodic(pingInterval, (_) => send(ping()));
+    _lastInbound = DateTime.now();
+    _pingTimer = Timer.periodic(pingInterval, (_) {
+      if (DateTime.now().difference(_lastInbound) > silenceLimit) {
+        close(); // nothing heard back: the projector is gone even though TCP has not noticed
+        return;
+      }
+      send(ping());
+    });
   }
 
   void _onDropped() {

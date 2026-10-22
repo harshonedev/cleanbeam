@@ -60,7 +60,8 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final m = widget.manager;
-    final iconBase = m.kind == TransportKind.wifi ? 'http://${widget.pairing.ip}:7273' : null;
+    final host = m.activeHost;
+    final iconBase = m.kind == TransportKind.wifi && host != null ? 'http://$host:7273' : null;
     final pages = [
       RemoteScreen(sink: m),
       AppsScreen(

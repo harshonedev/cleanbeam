@@ -12,6 +12,7 @@ class FakeProjector {
   HttpServer? server;
   final received = <String>[];
   final sockets = <WebSocket>[];
+  bool mute = false;
   int get port => server!.port;
 
   Future<void> start({String token = 'TOKEN', String? pin}) async {
@@ -36,7 +37,7 @@ class FakeProjector {
           }
           return;
         }
-        if (m['t'] == 'ping') ws.add('{"t":"pong"}');
+        if (m['t'] == 'ping' && !mute) ws.add('{"t":"pong"}');
         if (m['t'] == 'apps') ws.add('{"t":"apps","items":[{"pkg":"a","label":"A"}]}');
       });
     });
@@ -92,6 +93,20 @@ void main() {
     t.send(apps());
     await Future.delayed(const Duration(milliseconds: 200));
     expect(events.whereType<AppsEvent>().single.items.single.label, 'A');
+    await t.close();
+  });
+
+  test('ws drops the link when pongs stop arriving', () async {
+    await p.start();
+    final t = WsTransport('127.0.0.1', p.port, token: 'TOKEN',
+        pingInterval: const Duration(milliseconds: 50), silenceLimit: const Duration(milliseconds: 200));
+    final states = <bool>[];
+    t.connected.listen(states.add);
+    await t.connect();
+    // keep the socket open but stop answering: the fake only answers ping with pong, so mute it
+    p.mute = true;
+    await Future.delayed(const Duration(milliseconds: 500));
+    expect(states, [true, false]);
     await t.close();
   });
 

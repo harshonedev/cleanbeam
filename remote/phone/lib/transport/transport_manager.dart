@@ -20,6 +20,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
   static const backoff = [Duration(seconds: 1), Duration(seconds: 2), Duration(seconds: 4), Duration(seconds: 8)];
 
   Transport? _active;
+  String? _activeHost;
   StreamSubscription? _eventSub;
   StreamSubscription? _stateSub;
   final _events = StreamController<Event>.broadcast();
@@ -42,6 +43,9 @@ class TransportManager extends ChangeNotifier implements CommandSink {
   });
 
   Transport? get active => _active;
+
+  /// IP the current Wi-Fi link uses (mDNS result or saved IP); null on BLE or when offline.
+  String? get activeHost => _active?.kind == TransportKind.wifi ? _activeHost : null;
   @override
   TransportKind? get kind => _active?.kind;
   @override
@@ -156,6 +160,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
         await t.close();
         return null;
       }
+      _activeHost = host;
       return t;
     } catch (e) {
       lastError = 'wifi: $e';

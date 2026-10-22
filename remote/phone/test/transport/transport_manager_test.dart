@@ -165,6 +165,21 @@ void main() {
     });
   });
 
+  test('activeHost is the host the winning wifi transport used', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi),
+        makeBle: () => ScriptedTransport(TransportKind.ble, succeed: false),
+        mdnsIp: '192.168.10.99',
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(milliseconds: 100));
+      expect(m.activeHost, '192.168.10.99');
+      m.stop();
+    });
+  });
+
   test('send without a connection records lastError', () {
     fakeAsync((async) {
       final h = Harness(
