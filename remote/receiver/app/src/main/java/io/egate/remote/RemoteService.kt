@@ -50,8 +50,12 @@ class RemoteService : Service() {
         ws = WsServer(this, router, apps).also { runCatching { it.start() }.onFailure { e -> Log.e(TAG, "ws start failed", e) } }
         ble = BleServer(this, router, status).also { runCatching { it.start() }.onFailure { e -> Log.e(TAG, "ble start failed", e) } }
         scheduler.scheduleWithFixedDelay({ pushStatusIfChanged() }, 2, 2, TimeUnit.SECONDS)
+        status.addListener(statusListener)
+        broadcastStatus(this)
         Log.i(TAG, "RemoteService created")
     }
+
+    private val statusListener: () -> Unit = { broadcastStatus(this) }
 
     private fun pushStatusIfChanged() {
         try {
@@ -93,6 +97,7 @@ class RemoteService : Service() {
     }
 
     override fun onDestroy() {
+        status.removeListener(statusListener)
         scheduler.shutdownNow()
         ws?.stop(); ble?.stop()
         injector.close()
@@ -133,6 +138,17 @@ class RemoteService : Service() {
 
         fun start(ctx: Context) {
             ContextCompat.startForegroundService(ctx, Intent(ctx, RemoteService::class.java))
+        }
+
+        /** Launcher-facing status: who is connected and the Bluetooth state. Explicit to our launcher only. */
+        const val ACTION_STATUS = "io.egate.remote.STATUS"
+        const val LAUNCHER_PKG = "io.egate.launcher"
+
+        fun broadcastStatus(ctx: Context) {
+            ctx.sendBroadcast(Intent(ACTION_STATUS)
+                .setPackage(LAUNCHER_PKG)
+                .putStringArrayListExtra("clients", ArrayList(status.clients()))
+                .putExtra("bluetooth", status.bluetooth))
         }
     }
 }

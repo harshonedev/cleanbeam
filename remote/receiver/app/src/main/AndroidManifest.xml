@@ -46,6 +46,14 @@
             android:foregroundServiceType="connectedDevice" />
 
         <receiver
+            android:name=".StatusQueryReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.egate.remote.QUERY_STATUS" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".BootReceiver"
             android:exported="true">
             <intent-filter>
