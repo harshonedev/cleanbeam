@@ -143,12 +143,14 @@ class RemoteService : Service() {
         /** Launcher-facing status: who is connected and the Bluetooth state. Explicit to our launcher only. */
         const val ACTION_STATUS = "io.egate.remote.STATUS"
         const val LAUNCHER_PKG = "io.egate.launcher"
+        /** Signature permission (declared in our manifest) gating both directions of the status IPC. */
+        const val PERMISSION_STATUS = "io.egate.remote.permission.STATUS"
 
         fun broadcastStatus(ctx: Context) {
             ctx.sendBroadcast(Intent(ACTION_STATUS)
                 .setPackage(LAUNCHER_PKG)
                 .putStringArrayListExtra("clients", ArrayList(status.clients()))
-                .putExtra("bluetooth", status.bluetooth))
+                .putExtra("bluetooth", status.bluetooth), PERMISSION_STATUS)
         }
     }
 }

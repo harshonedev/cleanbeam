@@ -40,7 +40,9 @@ class RemoteLink(private val context: Context, private val onChange: () -> Unit)
     }
 
     fun start() {
-        ContextCompat.registerReceiver(context, receiver, IntentFilter(ACTION_STATUS), ContextCompat.RECEIVER_EXPORTED)
+        // Only a sender holding our signature-level permission can deliver STATUS, so nothing else
+        // on the box can fake a connected phone.
+        ContextCompat.registerReceiver(context, receiver, IntentFilter(ACTION_STATUS), PERMISSION_STATUS, null, ContextCompat.RECEIVER_EXPORTED)
         query()
     }
 
@@ -58,5 +60,6 @@ class RemoteLink(private val context: Context, private val onChange: () -> Unit)
         const val REMOTE_PKG = "io.egate.remote"
         const val ACTION_STATUS = "io.egate.remote.STATUS"
         const val ACTION_QUERY = "io.egate.remote.QUERY_STATUS"
+        const val PERMISSION_STATUS = "io.egate.remote.permission.STATUS"
     }
 }
