@@ -63,6 +63,12 @@ class PairingStore(private val backing: Backing) : io.egate.remote.router.Creden
 
     companion object {
         const val MAX_PIN_FAILURES = 5
+
+        @Volatile private var shared: PairingStore? = null
+
+        /** The single store the service's router and the pairing screen both use. */
+        fun get(ctx: Context): PairingStore =
+            shared ?: synchronized(this) { shared ?: PairingStore(ctx.applicationContext).also { shared = it } }
     }
 
     private fun sha256(s: String): ByteArray = MessageDigest.getInstance("SHA-256").digest(s.toByteArray())

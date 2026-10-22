@@ -53,7 +53,7 @@ class WsServer(
         val info = NsdServiceInfo().apply {
             serviceName = SERVICE_NAME
             serviceType = SERVICE_TYPE
-            setPort(port)
+            setPort(this@WsServer.port) // `port` alone resolves to NsdServiceInfo.port (0) inside apply
         }
         val listener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(i: NsdServiceInfo) { Log.i(TAG, "mdns registered as ${i.serviceName}") }

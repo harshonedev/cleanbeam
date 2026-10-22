@@ -27,7 +27,7 @@ class PairingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pairing)
         RemoteService.start(this)
-        store = PairingStore(this)
+        store = PairingStore.get(this)
         qr = findViewById(R.id.qr)
         pin = findViewById(R.id.pin)
         ip = findViewById(R.id.ip)
@@ -40,7 +40,6 @@ class PairingActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        RemoteService.pairingStore = store
         store.newPin()
         render()
     }

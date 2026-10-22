@@ -42,7 +42,7 @@ class RemoteService : Service() {
                 Log.e(TAG, "injector bootstrap failed", e)
             }
         }
-        val store = pairingStore ?: PairingStore(this).also { pairingStore = it }
+        val store = PairingStore.get(this)
         apps = AppsHandler(this)
         val version = packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
         router = CommandRouter(store, { json -> injector.send(json) }, apps, WsServer.SERVICE_NAME, version)
@@ -120,9 +120,6 @@ class RemoteService : Service() {
         const val ACTION_DEBUG_INJECT = "io.egate.remote.DEBUG_INJECT"
         private const val CHANNEL_ID = "egate_remote"
         private const val NOTIFICATION_ID = 1
-
-        /** Shared so PairingActivity's PIN is visible to the router. */
-        @Volatile var pairingStore: PairingStore? = null
 
         private val NOOP_SESSION = object : io.egate.remote.router.Session {
             override fun send(json: String) {}

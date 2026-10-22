@@ -34,9 +34,17 @@ class AdbClient(private val host: String = "127.0.0.1", private val port: Int = 
         }
     }
 
-    /** Run a shell command and return its combined output once the stream closes. */
-    fun shell(cmd: String, timeoutMs: Long = 10_000): String {
-        val localId = open("shell:$cmd")
+    /** Run a shell command (legacy `shell:` service, pty-backed) and return its output once the stream closes. */
+    fun shell(cmd: String, timeoutMs: Long = 10_000): String = run("shell:$cmd", timeoutMs)
+
+    /**
+     * Run a command through the `exec:` service: no pty, plain pipes. Use this to start background
+     * processes that must outlive the stream; with `shell:` adbd's pty teardown kills them.
+     */
+    fun exec(cmd: String, timeoutMs: Long = 10_000): String = run("exec:$cmd", timeoutMs)
+
+    private fun run(destination: String, timeoutMs: Long): String {
+        val localId = open(destination)
         val out = StringBuilder()
         val deadline = System.currentTimeMillis() + timeoutMs
         socket?.soTimeout = timeoutMs.toInt()
@@ -55,11 +63,6 @@ class AdbClient(private val host: String = "127.0.0.1", private val port: Int = 
             }
         }
         return out.toString()
-    }
-
-    /** Open a shell stream for a long-running command and return without waiting for it to finish. */
-    fun shellDetached(cmd: String) {
-        open("shell:$cmd")
     }
 
     /** Sends OPEN and waits for the matching OKAY; returns our local stream id. */

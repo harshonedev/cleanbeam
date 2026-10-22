@@ -16,7 +16,8 @@ import java.io.OutputStream
  * Reads newline-delimited JSON commands from a LocalServerSocket and injects them.
  */
 object Main {
-    const val SOCKET_NAME = "egate-injector"
+    /** One socket per app uid, so a reinstall under a new uid never talks to a stale helper. */
+    fun socketName(uid: Int) = "egate-injector-$uid"
 
     /**
      * args: --uid <N>  only accept connections from this uid (the receiver app). Mandatory.
@@ -37,8 +38,9 @@ object Main {
             injector.key(20, io.egate.remote.protocol.KeyAction.TAP)
             System.err.println("selftest: injected DPAD_DOWN")
         }
-        val server = try { LocalServerSocket(SOCKET_NAME) } catch (e: Exception) {
-            System.err.println("egate-injector: cannot bind $SOCKET_NAME (already running?): $e")
+        val name = socketName(allowedUid)
+        val server = try { LocalServerSocket(name) } catch (e: Exception) {
+            System.err.println("egate-injector: cannot bind $name (already running?): $e")
             System.exit(1)
             return
         }
@@ -78,8 +80,9 @@ object Main {
     }
 
     internal fun handle(line: String, injector: InputInjector): String {
-        if (line.contains("\"hello\"")) return "{\"t\":\"hello_ok\",\"pid\":${Process.myPid()}}"
-        val ok = when (val c = Codec.decodeCommand(line)) {
+        val c = Codec.decodeCommand(line)
+        if (c is Command.Unknown && c.t == "hello") return "{\"t\":\"hello_ok\",\"pid\":${Process.myPid()}}"
+        val ok = when (c) {
             is Command.Key -> injector.key(c.code, c.action)
             is Command.Text -> injector.text(c.s)
             is Command.Mouse -> injector.mouseMove(c.dx, c.dy)
