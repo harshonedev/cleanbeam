@@ -99,7 +99,8 @@ void main() {
       expect(m.kind, TransportKind.ble);
       expect(m.active, isNotNull);
       m.send(key(20));
-      expect(h.ble.single.sent.single['code'], 20);
+      expect(h.ble.single.sent.first['t'], 'status'); // requested on attach
+      expect(h.ble.single.sent.last['code'], 20);
       m.stop();
     });
   });

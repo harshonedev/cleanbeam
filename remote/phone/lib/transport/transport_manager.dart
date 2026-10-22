@@ -4,10 +4,11 @@ import 'package:flutter/foundation.dart';
 
 import '../pairing/pairing.dart';
 import '../protocol/message.dart';
+import 'command_sink.dart';
 import 'transport.dart';
 
 /// Races Wi-Fi and BLE, prefers Wi-Fi, reconnects with backoff.
-class TransportManager extends ChangeNotifier {
+class TransportManager extends ChangeNotifier implements CommandSink {
   final Pairing pairing;
   final Future<String?> Function(String name) resolveMdns;
   final Transport Function(String host) makeWs;
@@ -27,7 +28,10 @@ class TransportManager extends ChangeNotifier {
   int _attempt = 0;
   int _generation = 0;
   Timer? _retryTimer;
+  @override
   String? lastError;
+  @override
+  StatusInfo? lastStatus;
 
   TransportManager({
     required this.pairing,
@@ -38,7 +42,9 @@ class TransportManager extends ChangeNotifier {
   });
 
   Transport? get active => _active;
+  @override
   TransportKind? get kind => _active?.kind;
+  @override
   bool get connecting => _connecting;
   Stream<Event> get events => _events.stream;
 
@@ -56,6 +62,7 @@ class TransportManager extends ChangeNotifier {
     _detach();
   }
 
+  @override
   void send(Map<String, dynamic> msg) {
     final t = _active;
     if (t == null) {
@@ -184,7 +191,14 @@ class TransportManager extends ChangeNotifier {
     _eventSub?.cancel();
     _stateSub?.cancel();
     _active = t;
-    _eventSub = t.events.listen(_events.add);
+    _eventSub = t.events.listen((e) {
+      if (e is StatusEvent) {
+        lastStatus = e.info;
+        notifyListeners();
+      }
+      _events.add(e);
+    });
+    t.send(status());
     _stateSub = t.connected.listen((up) {
       if (!up && _active == t) _onDropped();
     });

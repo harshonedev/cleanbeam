@@ -31,7 +31,7 @@ class FlutterBluePlusGatt implements BleGatt {
 
   @override
   Future<void> connect() async {
-    await device.connect(license: License.free, timeout: const Duration(seconds: 8), autoConnect: false);
+    await device.connect(license: License.nonprofit, timeout: const Duration(seconds: 8), autoConnect: false);
     _stateSub = device.connectionState.listen((s) {
       if (s == BluetoothConnectionState.disconnected) _disconnected.add(null);
     });
