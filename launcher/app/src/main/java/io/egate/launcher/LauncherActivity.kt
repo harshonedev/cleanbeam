@@ -12,8 +12,8 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
@@ -91,11 +91,16 @@ class LauncherActivity : AppCompatActivity() {
     private var bgFront = false                // which bg layer is visible: false = A, true = B
     private var tintColor = 0
     private var tintAnim: ValueAnimator? = null
-    private var tintDrawable = GradientDrawable()
+    private lateinit var tintDrawable: BitmapDrawable   // white gradient mask, tinted with the room colour
     private var wallpaperKey = ""
     private var firstLoad = true
     private var homeFirstShow = true           // cold start lands on the first card even if a tab holds focus
     private var heroGen = 0                    // bumps per hero change so a cancelled fade can't leave it hidden
+    private var usageAccess = false            // AppOps answer, refreshed on resume instead of per hero
+    private var clockPattern = ""
+    private var clockFormat: SimpleDateFormat? = null
+    private var lastClockText: String? = null
+    private var lastWallpaperMinute = -1L
 
     private val io = Executors.newSingleThreadExecutor()
     private val rowsIo = Executors.newFixedThreadPool(3)   // Home shelves fetch side by side
@@ -125,6 +130,9 @@ class LauncherActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
         setContentView(R.layout.activity_launcher)
+        // The theme's gradient is only the launch splash: root paints the whole screen itself, so
+        // drop the window background instead of filling 1280x720 twice on every frame.
+        window.setBackgroundDrawable(null)
 
         root = findViewById(R.id.root)
         bgA = findViewById(R.id.bg_a)
@@ -156,8 +164,14 @@ class LauncherActivity : AppCompatActivity() {
         emptyHint = findViewById(R.id.empty_hint)
         stats = findViewById(R.id.stats)
 
+        // Full-screen gradients cost this GPU ~5 ms each per frame as shaders; as bitmaps they are free.
+        val dm = resources.displayMetrics
+        tintDrawable = Layers.tintMask(resources, dm.widthPixels / 4, dm.heightPixels / 4)
         tint.background = tintDrawable
-        root.background = Sky.drawable(prefs.ambientSky)
+        tint.visibility = View.INVISIBLE   // nothing to show until the first card paints the room
+        findViewById<View>(R.id.scrim_left_v).background = Layers.row(resources, getDrawable(R.drawable.scrim_left)!!, dm.widthPixels)
+        findViewById<View>(R.id.scrim_bottom_v).background = Layers.column(resources, getDrawable(R.drawable.scrim_bottom)!!, dm.heightPixels)
+        root.background = skyBackground()
 
         setupTab(tabHome) { selectTab(Tab.HOME) }
         setupTab(tabApps) { selectTab(Tab.APPS) }
@@ -215,13 +229,19 @@ class LauncherActivity : AppCompatActivity() {
         underline.post { moveUnderline(currentTabView(), animate = false); paintTabs() }
 
         root.viewTreeObserver.addOnGlobalFocusChangeListener { old, new -> onFocusMoved(old, new) }
+        // One synchronous read for the first frame; after that the network callback keeps it current.
+        val caps = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+        wifi.visibility = if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) View.VISIBLE else View.GONE
         reloadApps()
         if (prefs.keepAwake) KeepAliveService.start(this)
     }
 
     override fun onResume() {
         super.onResume()
+        usageAccess = AppRepository.hasUsageAccess(this)
+        lastWallpaperMinute = -1
         updateClock(); handler.post(tick)
+        runCatching { connectivity.registerDefaultNetworkCallback(netCallback, handler) }
         registerReceiver(timeReceiver, IntentFilter(Intent.ACTION_TIME_TICK))
         registerReceiver(packageReceiver, IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
@@ -229,7 +249,7 @@ class LauncherActivity : AppCompatActivity() {
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         })
-        if (!firstLoad) reloadApps()
+        if (!firstLoad) refreshApps()
         ensureScreensaver()
         remote.start()
     }
@@ -255,12 +275,13 @@ class LauncherActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(tick)
+        runCatching { connectivity.unregisterNetworkCallback(netCallback) }
         runCatching { unregisterReceiver(timeReceiver) }
         runCatching { unregisterReceiver(packageReceiver) }
         remote.stop()
     }
 
-    override fun onDestroy() { super.onDestroy(); io.shutdownNow() }
+    override fun onDestroy() { super.onDestroy(); io.shutdownNow(); rowsIo.shutdownNow() }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
@@ -373,19 +394,29 @@ class LauncherActivity : AppCompatActivity() {
             if (prefs.showSeconds) append(":ss")
             if (!prefs.clock24h) append(" a")
         }
-        clock.text = SimpleDateFormat(pattern, Locale.getDefault()).format(now)
-        wifi.visibility = if (wifiConnected()) View.VISIBLE else View.GONE
+        val fmt = clockFormat?.takeIf { pattern == clockPattern }
+            ?: SimpleDateFormat(pattern, Locale.getDefault()).also { clockFormat = it; clockPattern = pattern }
+        val text = fmt.format(now)
+        // Same text means no relayout and no frame: with seconds hidden the screen stays still for a minute.
+        if (text != lastClockText) { lastClockText = text; clock.text = text }
 
-        if (prefs.showStats) { stats.visibility = View.VISIBLE; stats.text = statsLine() }
-        else stats.visibility = View.GONE
+        if (prefs.showStats) {
+            stats.visibility = View.VISIBLE
+            val line = statsLine()
+            if (line != stats.text.toString()) stats.text = line
+        } else stats.visibility = View.GONE
 
-        applyWallpaper()
+        val minute = now.time / 60_000
+        if (minute != lastWallpaperMinute) { lastWallpaperMinute = minute; applyWallpaper() }
     }
 
-    private fun wifiConnected(): Boolean {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
-        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+    private val connectivity by lazy { getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
+    /** Wi-Fi icon follows the default network; the system calls back on changes, nothing polls. */
+    private val netCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            wifi.visibility = if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) View.VISIBLE else View.GONE
+        }
+        override fun onLost(network: Network) { wifi.visibility = View.GONE }
     }
 
     /** Wallpaper mode replaces per-item art with a user image; otherwise the focused item paints the room. */
@@ -423,21 +454,21 @@ class LauncherActivity : AppCompatActivity() {
             .withEndAction { hide.setImageDrawable(null) }.start()
     }
 
+    private fun skyBackground(): Drawable =
+        Layers.column(resources, Sky.drawable(prefs.ambientSky), resources.displayMetrics.heightPixels)
+
     private fun animateTint(color: Int) {
         if (color == tintColor) return
         val from = if (tintColor == 0) Color.TRANSPARENT else tintColor
         tintColor = color
+        tint.visibility = View.VISIBLE
         tintAnim?.cancel()
         tintAnim = ValueAnimator.ofObject(ArgbEvaluator(), from, color).apply {
             duration = 650; interpolator = ease
             addUpdateListener { a ->
                 val c = a.animatedValue as Int
-                tintDrawable.orientation = GradientDrawable.Orientation.TL_BR
-                tintDrawable.colors = intArrayOf(
-                    Color.argb(0x7A, Color.red(c), Color.green(c), Color.blue(c)),
-                    Color.argb(0x24, Color.red(c), Color.green(c), Color.blue(c)),
-                    Color.TRANSPARENT
-                )
+                // The mask carries the alpha ramp; only the colour changes.
+                tintDrawable.setTint(Color.rgb(Color.red(c), Color.green(c), Color.blue(c)))
             }
             start()
         }
@@ -466,6 +497,20 @@ class LauncherActivity : AppCompatActivity() {
                 populate(animate = firstLoad)
                 firstLoad = false
             }
+        }
+    }
+
+    /**
+     * Back from another app: only the usage figures can have moved, so refresh those and keep the
+     * decoded icons, banners and colors. A changed set of installed apps still reloads everything.
+     */
+    private fun refreshApps() {
+        val current = allApps
+        io.execute {
+            val installed = runCatching { AppRepository.installedPackages(this) }.getOrNull()
+            if (installed == null || installed != current.mapTo(HashSet()) { it.packageName }) { reloadApps(); return@execute }
+            val apps = runCatching { AppRepository.withUsage(this, current) }.getOrDefault(current)
+            handler.post { allApps = apps; populate(animate = false) }
         }
     }
 
@@ -581,7 +626,7 @@ class LauncherActivity : AppCompatActivity() {
         emptyTitle.text = getString(title); emptyHint.text = getString(hint)
         empty.visibility = View.VISIBLE
         heroItem = null
-        hero.animate().alpha(0f).setDuration(200).start()
+        hero.animate().alpha(0f).setDuration(200).withLayer().start()
         crossfadeArt(null); animateTint(prefs.accentColor)
     }
 
@@ -714,6 +759,7 @@ class LauncherActivity : AppCompatActivity() {
             if (focused == null || homeFirstShow) focusFirstShelfCard()
         }
         homeFirstShow = false
+        shelvesAdapter.warmUp(shelves)
     }
 
     private fun firstCard(rv: View?): View? =
@@ -743,11 +789,11 @@ class LauncherActivity : AppCompatActivity() {
         val gen = ++heroGen
         if (!animate) { apply(); hero.alpha = 1f; hero.translationY = 0f; return }
         hero.animate().cancel()
-        hero.animate().alpha(0f).translationY(6f).setDuration(110).withEndAction {
+        hero.animate().alpha(0f).translationY(6f).setDuration(110).withLayer().withEndAction {
             if (gen != heroGen) return@withEndAction
             apply()
             hero.translationY = 14f
-            hero.animate().alpha(1f).translationY(0f).setDuration(320).setInterpolator(ease).start()
+            hero.animate().alpha(1f).translationY(0f).setDuration(320).setInterpolator(ease).withLayer().start()
         }.start()
     }
 
@@ -763,7 +809,7 @@ class LauncherActivity : AppCompatActivity() {
                 val hrs = app.foregroundMs / 3_600_000
                 if (hrs >= 1) "Last opened $rel, ${hrs}h this month" else "Last opened $rel"
             }
-            AppRepository.hasUsageAccess(this) -> "Not opened this month"
+            usageAccess -> "Not opened this month"
             app.installTime > 0 -> "Installed " + relative(app.installTime, DateUtils.DAY_IN_MILLIS)
             else -> ""
         }
@@ -958,7 +1004,7 @@ class LauncherActivity : AppCompatActivity() {
                     3 -> pickAccent()
                     4 -> { prefs.appGlow = !prefs.appGlow; retint(); showLauncherOptions() }
                     5 -> wallpaperMenu()
-                    6 -> { prefs.ambientSky = !prefs.ambientSky; root.background = Sky.drawable(prefs.ambientSky); showLauncherOptions() }
+                    6 -> { prefs.ambientSky = !prefs.ambientSky; root.background = skyBackground(); showLauncherOptions() }
                     7 -> { prefs.showStats = !prefs.showStats; updateClock(); showLauncherOptions() }
                     8 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showLauncherOptions() }
                     9 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showLauncherOptions() }
@@ -985,6 +1031,7 @@ class LauncherActivity : AppCompatActivity() {
             .setView(input)
             .setPositiveButton("Save") { _, _ ->
                 prefs.tmdbToken = input.text.toString()
+                Tmdb.invalidateToken()
                 Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
                 if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME)
             }

@@ -17,7 +17,12 @@ class SkeletonAdapter(private val count: Int = 6) : RecyclerView.Adapter<Skeleto
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.item_skeleton, parent, false)
-        return VH(v).also { it.card.clipToOutline = true }
+        return VH(v).also {
+            it.card.clipToOutline = true
+            // A single flat drawable: fading it needs no offscreen layer, so a dozen pulsing
+            // cards cost the GPU a dozen quads instead of a dozen render targets per frame.
+            it.card.forceHasOverlappingRendering(false)
+        }
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
@@ -35,6 +40,9 @@ class SkeletonAdapter(private val count: Int = 6) : RecyclerView.Adapter<Skeleto
         holder.pulse?.cancel(); holder.pulse = null
         holder.card.alpha = 1f
     }
+
+    override fun onViewDetachedFromWindow(holder: VH) { holder.pulse?.pause() }
+    override fun onViewAttachedToWindow(holder: VH) { holder.pulse?.resume() }
 
     override fun getItemCount() = count
 }

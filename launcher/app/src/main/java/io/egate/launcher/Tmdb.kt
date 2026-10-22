@@ -30,11 +30,19 @@ object Tmdb {
     class Provider(val id: Int, val name: String, val priority: Int)
 
     // ---------- config ----------
+    @Volatile private var cachedToken: String? = null
+
     fun token(context: Context): String {
+        cachedToken?.let { return it }
         val p = Prefs(context).tmdbToken.trim()
-        if (p.isNotEmpty()) return p
-        return runCatching { File(context.getExternalFilesDir(null), "tmdb.key").readText().trim() }.getOrDefault("")
+        val t = if (p.isNotEmpty()) p
+                else runCatching { File(context.getExternalFilesDir(null), "tmdb.key").readText().trim() }.getOrDefault("")
+        if (t.isNotEmpty()) cachedToken = t   // an empty result is re-checked: the key file may be pushed later
+        return t
     }
+
+    /** Call after the token changes in prefs. */
+    fun invalidateToken() { cachedToken = null }
 
     fun configured(context: Context) = token(context).isNotEmpty()
 

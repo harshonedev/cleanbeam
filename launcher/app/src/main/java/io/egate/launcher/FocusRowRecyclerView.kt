@@ -18,6 +18,20 @@ class FocusRowRecyclerView @JvmOverloads constructor(
 
     init { layoutManager = ParkingLayoutManager(context, HORIZONTAL) }
 
+    /**
+     * The end padding only has to let the last card park at the start padding, so it is trimmed
+     * to exactly that once the width is known. The layout manager fills the padding with real
+     * cards (clipToPadding is off), so a generous XML value meant binding and loading art for
+     * cards that sit far past the right edge of the screen.
+     */
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w <= 0) return
+        val slot = Cards.dp(this, SLOT_DP).toInt()
+        val end = (w - paddingStart - slot).coerceAtLeast(0)
+        if (end != paddingEnd) setPaddingRelative(paddingStart, paddingTop, end, paddingBottom)
+    }
+
     override fun focusSearch(focused: View?, direction: Int): View? {
         if (direction == View.FOCUS_UP) upTarget?.let { return it }
         val next = super.focusSearch(focused, direction)
@@ -33,4 +47,8 @@ class FocusRowRecyclerView @JvmOverloads constructor(
         return false
     }
 
+    companion object {
+        /** Width of one card slot: the 212dp card plus 9dp padding on each side (item_title / item_app). */
+        private const val SLOT_DP = 230f
+    }
 }

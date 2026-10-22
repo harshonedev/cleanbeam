@@ -19,6 +19,8 @@ class Service(
     private val searchTemplate: String?
 ) {
     private val tmdbLower = tmdbNames.map { it.lowercase() }
+    /** Normalized TMDB names plus our own, computed once: label matching runs per installed app. */
+    internal val normNames: List<String> = (tmdbNames + name).map { Services.norm(it) }.filter { it.length >= 4 }
 
     fun matchesPkg(pkg: String) = pkgFragments.any { pkg.contains(it) }
     fun matchesTmdbName(n: String) = n.lowercase() in tmdbLower
@@ -30,6 +32,9 @@ class Service(
 }
 
 object Services {
+
+    private val NOISE = setOf("video", "plus", "play", "tv", "app", "the", "for", "android", "premium", "channel", "store", "with", "ads", "free")
+    private val SEP = Regex("[^a-z0-9]+")
 
     val ALL: List<Service> = listOf(
         Service("Netflix", listOf("Netflix", "Netflix basic with Ads", "Netflix Kids"),
@@ -68,7 +73,6 @@ object Services {
         Service("Viki", listOf("Viki"), listOf("viki"), "com.viki.android", null)
     )
 
-    private val NOISE = setOf("video", "plus", "play", "tv", "app", "the", "for", "android", "premium", "channel", "store", "with", "ads", "free")
 
     /** The service an installed app belongs to, by package fragment first, then by label. */
     fun forApp(pkg: String, label: String): Service? {
@@ -76,9 +80,7 @@ object Services {
         ALL.firstOrNull { it.matchesPkg(p) }?.let { return it }
         val a = norm(label)
         if (a.length < 4) return null
-        return ALL.firstOrNull { s ->
-            (s.tmdbNames + s.name).any { n -> val b = norm(n); b.length >= 4 && (a == b || a.contains(b) || b.contains(a)) }
-        }
+        return ALL.firstOrNull { s -> s.normNames.any { b -> a == b || a.contains(b) || b.contains(a) } }
     }
 
     /** Installed apps that belong to a service, most recently used first; one app per service. */
@@ -101,6 +103,7 @@ object Services {
         return out
     }
 
-    private fun norm(s: String): String =
-        s.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() && it !in NOISE }.joinToString("")
+
+    internal fun norm(s: String): String =
+        s.lowercase().split(SEP).filter { it.isNotEmpty() && it !in NOISE }.joinToString("")
 }

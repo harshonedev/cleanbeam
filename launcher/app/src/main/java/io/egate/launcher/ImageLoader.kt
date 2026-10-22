@@ -18,9 +18,12 @@ object ImageLoader {
 
     private val pool = Executors.newFixedThreadPool(3)
     private val main = Handler(Looper.getMainLooper())
-    private val mem = object : LruCache<String, Bitmap>(24 * 1024) {
+    /** 16 MB of RGB_565 pixels: ~160 shelf cards at w300, on a box with 1 GB of RAM in total. */
+    private val mem = object : LruCache<String, Bitmap>(16 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount / 1024
     }
+    /** URLs being fetched right now, so two cards wanting the same art share one download. */
+    private val inFlight = HashMap<String, MutableList<(Bitmap?) -> Unit>>()
 
     /** Set the image on [target] once it arrives; a recycled view that moved on is left alone. */
     fun load(context: Context, url: String?, target: ImageView, maxPx: Int = 800) {
@@ -42,11 +45,20 @@ object ImageLoader {
      * Lets callers do Palette or scaling off the UI thread.
      */
     fun <T> fetch(context: Context, url: String, maxPx: Int, work: (Bitmap) -> T, done: (T?) -> Unit) {
-        val cached = mem.get(url)
-        pool.execute {
-            val bmp = cached ?: loadBitmap(context, url, maxPx)?.also { mem.put(url, it) }
+        val deliver: (Bitmap?) -> Unit = { bmp ->
             val result = bmp?.let { runCatching { work(it) }.getOrNull() }
             main.post { done(result) }
+        }
+        mem.get(url)?.let { cached -> pool.execute { deliver(cached) }; return }
+        val app = context.applicationContext
+        synchronized(inFlight) {
+            inFlight[url]?.let { it += deliver; return }
+            inFlight[url] = mutableListOf(deliver)
+        }
+        pool.execute {
+            val bmp = loadBitmap(app, url, maxPx)?.also { mem.put(url, it) }
+            val waiters = synchronized(inFlight) { inFlight.remove(url) } ?: emptyList()
+            for (w in waiters) w(bmp)
         }
     }
 
@@ -61,7 +73,7 @@ object ImageLoader {
             while (bounds.outWidth / sample > maxPx * 1.5) sample *= 2
             BitmapFactory.decodeFile(f.path, BitmapFactory.Options().apply {
                 inSampleSize = sample; inPreferredConfig = Bitmap.Config.RGB_565
-            })
+            })?.also { it.prepareToDraw() }   // GPU upload starts now, off the critical path of the frame that first draws it
         } catch (e: Exception) { f.delete(); null }
     }
 

@@ -12,6 +12,7 @@
         android:layout_width="212dp"
         android:layout_height="119dp"
         android:background="@drawable/card_surface"
+        android:foreground="@drawable/focus_ring"
         android:orientation="vertical"
         android:gravity="bottom"
         android:paddingHorizontal="16dp"

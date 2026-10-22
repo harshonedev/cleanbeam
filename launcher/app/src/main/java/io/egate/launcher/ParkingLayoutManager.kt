@@ -27,7 +27,7 @@ class ParkingLayoutManager(context: Context, orientation: Int) :
 
     /** Keep the shelves above and below laid out so D-pad focus search can land on them. */
     override fun calculateExtraLayoutSpace(state: RecyclerView.State, extraLayoutSpace: IntArray) {
-        if (orientation == VERTICAL) { extraLayoutSpace[0] = 700; extraLayoutSpace[1] = 700 }
+        if (orientation == VERTICAL) { extraLayoutSpace[0] = EXTRA_SHELF_PX; extraLayoutSpace[1] = EXTRA_SHELF_PX }
         else super.calculateExtraLayoutSpace(state, extraLayoutSpace)
     }
 
@@ -39,4 +39,10 @@ class ParkingLayoutManager(context: Context, orientation: Int) :
     override fun requestChildRectangleOnScreen(
         parent: RecyclerView, child: View, rect: Rect, immediate: Boolean, focusedChildVisible: Boolean
     ): Boolean = park(parent, child, immediate)
+
+    companion object {
+        /** One shelf (~210px) past each edge: enough for D-pad focus search to find the next shelf,
+         *  without keeping every shelf on the Home tab laid out, bound and loading art at once. */
+        private const val EXTRA_SHELF_PX = 320
+    }
 }

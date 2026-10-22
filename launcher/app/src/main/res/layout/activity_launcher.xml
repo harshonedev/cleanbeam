@@ -30,11 +30,13 @@
         android:layout_height="match_parent" />
 
     <View
+        android:id="@+id/scrim_left_v"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/scrim_left" />
 
     <View
+        android:id="@+id/scrim_bottom_v"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/scrim_bottom" />

@@ -12,6 +12,7 @@
         android:layout_width="212dp"
         android:layout_height="119dp"
         android:background="@drawable/card_surface"
+        android:foreground="@drawable/focus_ring"
         android:focusable="true"
         android:clickable="true">
 
@@ -23,10 +24,10 @@
             android:contentDescription="@null" />
 
         <View
+            android:id="@+id/card_scrim"
             android:layout_width="match_parent"
             android:layout_height="64dp"
-            android:layout_gravity="bottom"
-            android:background="@drawable/scrim_card" />
+            android:layout_gravity="bottom" />
 
         <TextView
             android:id="@+id/name"

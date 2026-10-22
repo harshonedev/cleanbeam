@@ -2,7 +2,6 @@ package io.egate.launcher
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.StateListDrawable
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -38,7 +37,6 @@ class AppAdapter(
         val v = LayoutInflater.from(parent.context).inflate(layout, parent, false)
         val vh = VH(v)
         vh.card.clipToOutline = true
-        vh.card.foreground = focusRing(vh.card)
         return vh
     }
 
@@ -105,23 +103,6 @@ class AppAdapter(
     private fun dp(v: View, value: Float): Float =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, v.resources.displayMetrics)
 
-    private fun focusRing(v: View): StateListDrawable {
-        val radius = dp(v, 14f)
-        val focused = GradientDrawable().apply {
-            cornerRadius = radius
-            setColor(Color.TRANSPARENT)
-            setStroke(dp(v, 3f).toInt(), Color.WHITE)
-        }
-        val normal = GradientDrawable().apply {
-            cornerRadius = radius
-            setColor(Color.TRANSPARENT)
-            setStroke(dp(v, 1f).toInt(), 0x22FFFFFF)
-        }
-        return StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_focused), focused)
-            addState(intArrayOf(), normal)
-        }
-    }
 
     /** Apps without a banner get a diagonal wash of their own color, dark enough for the label. */
     private fun fallbackArt(v: View, color: Int): GradientDrawable {
