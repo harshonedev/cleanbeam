@@ -1,0 +1,23 @@
+# Android / Gradle
+**/build/
+.gradle/
+local.properties
+*.iml
+.idea/
+.kotlin/
+*.apk
+*.ap_
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+remote/phone/ios/Pods/
+remote/phone/ios/.symlinks/
+remote/phone/ios/Flutter/ephemeral/
+# superpowers scratch
+.superpowers/
+# macOS
+.DS_Store

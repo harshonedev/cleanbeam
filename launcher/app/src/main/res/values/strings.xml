@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">EGate Home</string>
+    <string name="screensaver_name">EGate Clock</string>
+    <string name="settings">Settings</string>
+    <string name="wifi">Wi-Fi</string>
+    <string name="options">Options</string>
+    <string name="apps">APPS</string>
+    <string name="favorites">FAVORITES</string>
+</resources>

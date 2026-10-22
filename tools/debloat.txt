@@ -1,0 +1,13 @@
+# EGate Atom 3X debloat list — reversible (pm disable-user --user 0)
+# User-approved 2026-10-23. Re-enable with tools/restore.sh or: pm enable <pkg>
+# --- Third-party app store (Play Store already present) ---
+cm.aptoide.pt
+# --- Ad / content pushers (Transsion) ---
+com.community.newroom
+com.community.mbox.tv
+# --- Telemetry / remote push / forced OTA (Jixin) ---
+com.jixin.analytics
+com.jixin.apppush
+com.jixin.ota
+# --- Ad screensaver that hijacks screensaver_components at boot ---
+com.jixin.screensaver
