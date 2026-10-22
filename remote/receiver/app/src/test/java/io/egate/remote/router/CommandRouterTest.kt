@@ -23,7 +23,10 @@ private class FakeApps : AppsProvider {
 
 private class FakeCredentials(override val token: String = "TOKEN") : Credentials {
     override var pairingPin: String? = null
+    var pairFailures = 0
     override fun matches(candidate: String): Boolean = candidate == token
+    override fun onPairFailed() { if (++pairFailures >= 5) pairingPin = null }
+    override fun onPaired() { pairingPin = null }
 }
 
 class CommandRouterTest {
@@ -76,6 +79,27 @@ class CommandRouterTest {
         assertEquals("""{"t":"pair_ok","token":"TOKEN","name":"EGate Atom3X"}""", s.sent[0])
         c.onMessage("""{"t":"ping"}""")
         assertEquals("""{"t":"pong"}""", s.sent[1])
+    }
+
+    @Test
+    fun `pin is cleared after a successful pair`() {
+        creds.pairingPin = "482913"
+        val s = FakeSession()
+        router.newConnection(s).onMessage("""{"t":"pair","code":"482913"}""")
+        assertEquals(null, creds.pairingPin)
+    }
+
+    @Test
+    fun `pin is invalidated after five failed attempts across connections`() {
+        creds.pairingPin = "482913"
+        repeat(5) {
+            val s = FakeSession()
+            router.newConnection(s).onMessage("""{"t":"pair","code":"000000"}""")
+        }
+        assertEquals(null, creds.pairingPin)
+        val s = FakeSession()
+        router.newConnection(s).onMessage("""{"t":"pair","code":"482913"}""")
+        assertEquals(listOf("""{"t":"pair_fail"}"""), s.sent)
     }
 
     @Test

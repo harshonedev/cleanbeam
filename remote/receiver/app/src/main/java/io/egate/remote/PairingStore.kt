@@ -30,16 +30,32 @@ class PairingStore(private val backing: Backing) : io.egate.remote.router.Creden
         return t
     }
 
+    private var pinFailures = 0
+
     fun newPin(): String {
         val pin = "%06d".format(random.nextInt(1_000_000))
+        pinFailures = 0
         pairingPin = pin
         return pin
+    }
+
+    @Synchronized
+    override fun onPairFailed() {
+        if (++pinFailures >= MAX_PIN_FAILURES) pairingPin = null
+    }
+
+    override fun onPaired() {
+        pairingPin = null
     }
 
     override fun matches(candidate: String): Boolean {
         val a = sha256(candidate)
         val b = sha256(token)
         return MessageDigest.isEqual(a, b)
+    }
+
+    companion object {
+        const val MAX_PIN_FAILURES = 5
     }
 
     private fun sha256(s: String): ByteArray = MessageDigest.getInstance("SHA-256").digest(s.toByteArray())

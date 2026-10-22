@@ -42,6 +42,19 @@ class PairingStoreTest {
     }
 
     @Test
+    fun `five pair failures clear the pin, newPin resets the counter`() {
+        val s = PairingStore(MemoryBacking())
+        s.newPin()
+        repeat(4) { s.onPairFailed() }
+        assertTrue(s.pairingPin != null)
+        s.onPairFailed()
+        assertEquals(null, s.pairingPin)
+        s.newPin()
+        repeat(4) { s.onPairFailed() }
+        assertTrue(s.pairingPin != null)
+    }
+
+    @Test
     fun `newPin is six digits and becomes pairingPin`() {
         val s = PairingStore(MemoryBacking())
         val pin = s.newPin()

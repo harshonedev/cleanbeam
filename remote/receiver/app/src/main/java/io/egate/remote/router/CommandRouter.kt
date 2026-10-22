@@ -15,6 +15,10 @@ interface Credentials {
     val token: String
     val pairingPin: String?
     fun matches(candidate: String): Boolean
+    /** Called on every wrong PIN; implementations invalidate the PIN after a few failures. */
+    fun onPairFailed()
+    /** Called after a successful pair; the PIN is single-use. */
+    fun onPaired()
 }
 
 interface AppsProvider {
@@ -73,9 +77,13 @@ class CommandRouter(
                     val pin = creds.pairingPin
                     if (pin != null && cmd.code == pin) {
                         authenticated = true
+                        creds.onPaired()
                         session.send(Codec.encodeEvent(Event.PairOk(creds.token, deviceName)))
                         return
-                    } else fail(Event.PairFail)
+                    } else {
+                        creds.onPairFailed()
+                        fail(Event.PairFail)
+                    }
                 }
                 else -> fail(Event.AuthFail)
             }
