@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import io.egate.remote.adb.AdbClient
 import androidx.core.content.ContextCompat
 
 class RemoteService : Service() {
@@ -19,6 +20,18 @@ class RemoteService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_DEBUG_SHELL -> {
+                val cmd = intent.getStringExtra("cmd") ?: "id"
+                Thread {
+                    try {
+                        AdbClient().use { it.connect(); Log.i(TAG, "debug shell '$cmd' → " + it.shell(cmd).trim()) }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "debug shell failed", e)
+                    }
+                }.start()
+            }
+        }
         return START_STICKY
     }
 
@@ -39,6 +52,7 @@ class RemoteService : Service() {
 
     companion object {
         const val TAG = "EGateRemote"
+        const val ACTION_DEBUG_SHELL = "io.egate.remote.DEBUG_SHELL"
         private const val CHANNEL_ID = "egate_remote"
         private const val NOTIFICATION_ID = 1
 
