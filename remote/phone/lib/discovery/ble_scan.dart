@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../transport/ble_gatt.dart';
+import 'permissions.dart';
 
 /// Finds the projector by its service UUID; returns the remoteId or null.
 Future<String?> findProjectorBle({Duration timeout = const Duration(seconds: 5)}) async {
   try {
     if (await FlutterBluePlus.isSupported == false) return null;
+    if (!await ensureBlePermissions()) return null;
     if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
       await FlutterBluePlus.adapterState.where((s) => s == BluetoothAdapterState.on).first.timeout(const Duration(seconds: 2));
     }

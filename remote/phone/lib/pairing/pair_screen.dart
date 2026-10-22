@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../discovery/mdns.dart';
+import '../discovery/permissions.dart';
 import '../transport/ws_transport.dart';
 import '../ui/theme.dart';
 import 'pairing.dart';
@@ -17,6 +18,15 @@ class PairScreen extends StatefulWidget {
 class _PairScreenState extends State<PairScreen> {
   bool _busy = false;
   String? _error;
+  bool? _cameraOk;
+
+  @override
+  void initState() {
+    super.initState();
+    ensureCameraPermission().then((ok) {
+      if (mounted) setState(() => _cameraOk = ok);
+    });
+  }
 
   Future<void> _detected(BarcodeCapture capture) async {
     if (_busy) return;
@@ -53,7 +63,17 @@ class _PairScreenState extends State<PairScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
-                  child: MobileScanner(onDetect: _detected),
+                  child: switch (_cameraOk) {
+                    true => MobileScanner(onDetect: _detected),
+                    false => Container(
+                        color: Tokens.surface,
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.all(24),
+                        child: const Text('Camera access is off. Allow it in Settings, or use the code below.',
+                            textAlign: TextAlign.center, style: TextStyle(color: Tokens.muted, height: 1.4)),
+                      ),
+                    null => Container(color: Tokens.surface),
+                  },
                 ),
               ),
             ),
