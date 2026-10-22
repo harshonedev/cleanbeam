@@ -34,6 +34,7 @@ class RemoteService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        running = true
         startForeground(NOTIFICATION_ID, buildNotification())
         injector = InjectorClient.create(applicationInfo.sourceDir, applicationInfo.uid)
         executor.execute {
@@ -97,6 +98,7 @@ class RemoteService : Service() {
     }
 
     override fun onDestroy() {
+        running = false
         status.removeListener(statusListener)
         scheduler.shutdownNow()
         ws?.stop(); ble?.stop()
@@ -127,6 +129,9 @@ class RemoteService : Service() {
 
         /** Live connection state for the pairing screen. */
         val status = ConnectionStatus()
+        /** True while the service is alive; reported to the launcher so it can say "not running" honestly. */
+        @Volatile var running = false
+            private set
         private const val CHANNEL_ID = "egate_remote"
         private const val NOTIFICATION_ID = 1
 
@@ -140,6 +145,18 @@ class RemoteService : Service() {
             ContextCompat.startForegroundService(ctx, Intent(ctx, RemoteService::class.java))
         }
 
+        /**
+         * Start only if the caller is allowed to launch a foreground service from where it is. Android 12+
+         * refuses that from a broadcast another app sent us, and letting the exception escape crash-loops
+         * the process until the system marks it bad and stops delivering our broadcasts at all.
+         */
+        fun startIfAllowed(ctx: Context): Boolean = try {
+            start(ctx); true
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "cannot start foreground service from here: " + e.javaClass.simpleName)
+            false
+        }
+
         /** Launcher-facing status: who is connected and the Bluetooth state. Explicit to our launcher only. */
         const val ACTION_STATUS = "io.egate.remote.STATUS"
         const val LAUNCHER_PKG = "io.egate.launcher"
@@ -149,6 +166,7 @@ class RemoteService : Service() {
         fun broadcastStatus(ctx: Context) {
             ctx.sendBroadcast(Intent(ACTION_STATUS)
                 .setPackage(LAUNCHER_PKG)
+                .putExtra("alive", running)
                 .putStringArrayListExtra("clients", ArrayList(status.clients()))
                 .putExtra("bluetooth", status.bluetooth), PERMISSION_STATUS)
         }

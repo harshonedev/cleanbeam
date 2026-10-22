@@ -8,7 +8,7 @@ import android.content.Intent
 class StatusQueryReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_QUERY) return
-        RemoteService.start(context)
+        if (!RemoteService.running) RemoteService.startIfAllowed(context)
         RemoteService.broadcastStatus(context)
     }
 

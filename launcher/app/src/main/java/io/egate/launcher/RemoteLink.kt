@@ -34,7 +34,7 @@ class RemoteLink(private val context: Context, private val onChange: () -> Unit)
             if (i?.action != ACTION_STATUS) return
             clients = i.getStringArrayListExtra("clients") ?: emptyList()
             bluetooth = i.getStringExtra("bluetooth") ?: ""
-            alive = true
+            alive = i.getBooleanExtra("alive", true)
             onChange()
         }
     }
