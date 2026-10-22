@@ -95,7 +95,12 @@ class AppAdapter(
 
     fun item(position: Int): AppInfo? = items.getOrNull(position)
 
-    fun submit(newItems: List<AppInfo>) { items = newItems; notifyDataSetChanged() }
+    /** Same-size refreshes rebind in place (no item animator), so a focused card keeps focus. */
+    fun submit(newItems: List<AppInfo>) {
+        val same = newItems.size == items.size
+        items = newItems
+        if (same) notifyItemRangeChanged(0, items.size) else notifyDataSetChanged()
+    }
 
     private fun dp(v: View, value: Float): Float =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, v.resources.displayMetrics)

@@ -212,6 +212,7 @@ class LauncherActivity : AppCompatActivity() {
         heroSubtitle.text = ""; heroMeta.visibility = View.GONE
         underline.post { moveUnderline(currentTabView(), animate = false); paintTabs() }
 
+        root.viewTreeObserver.addOnGlobalFocusChangeListener { old, new -> onFocusMoved(old, new) }
         reloadApps()
         if (prefs.keepAwake) KeepAliveService.start(this)
     }
@@ -284,16 +285,26 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     // ---------- tabs ----------
-    private fun setupTab(v: TextView, selectOnFocus: Boolean = true, onSelect: () -> Unit) {
+    private val tabViews get() = listOf(tabHome, tabApps, tabFavorites, tabSettings)
+    private val tabActions = HashMap<View, () -> Unit>()
+
+    private fun setupTab(v: TextView, onSelect: () -> Unit) {
         v.setOnClickListener { onSelect() }
-        v.setOnFocusChangeListener { view, hasFocus ->
-            if (hasFocus) {
-                moveUnderline(view, animate = true)
-                if (selectOnFocus) onSelect() else paintTabs()
-            } else {
-                paintTabs()
-                moveUnderline(currentTabView(), animate = true)
-            }
+        tabActions[v] = onSelect
+    }
+
+    /**
+     * Tabs select when focus *moves* onto them. Focus that arrives from nowhere is the system
+     * picking the first focusable view after the focused card vanished (a list refresh, coming
+     * back from another app); that must not switch tabs.
+     */
+    private fun onFocusMoved(old: View?, new: View?) {
+        if (new != null && new in tabViews) {
+            moveUnderline(new, animate = true)
+            if (old != null) tabActions[new]?.invoke() else paintTabs()
+        } else if (old != null && old in tabViews) {
+            paintTabs()
+            moveUnderline(currentTabView(), animate = true)
         }
     }
 
@@ -502,7 +513,7 @@ class LauncherActivity : AppCompatActivity() {
         grid.scrollToPosition(0)
         val focused = currentFocus
         val focusInGrid = focused != null && grid.findContainingItemView(focused) != null
-        if (focusInGrid || focused == null) grid.post { firstGridCard()?.requestFocus() }
+        if (focusInGrid || focused == null) grid.post { if (!focusInside(grid)) firstGridCard()?.requestFocus() }
         if (!focusInGrid) onCardFocused(list[0])
     }
 
@@ -544,12 +555,17 @@ class LauncherActivity : AppCompatActivity() {
         if (allApps.isEmpty()) return
         val focused = currentFocus
         val focusInGrid = focused != null && grid.findContainingItemView(focused) != null
-        if (focusInGrid || focused == null) grid.post { firstGridCard()?.requestFocus() }
-        if (!focusInGrid || (heroItem as? AppInfo)?.let { it !in allApps } != false) onCardFocused(allApps[0])
+        if (focusInGrid || focused == null) grid.post { if (!focusInside(grid)) firstGridCard()?.requestFocus() }
+        keepOrResetHero(allApps, focusInGrid)
         (heroItem as? AppInfo)?.let { bindActions(it) }
     }
 
     private fun firstGridCard(): View? = grid.getChildAt(0)?.findViewById(R.id.card)
+
+    private fun focusInside(rv: RecyclerView): Boolean {
+        val f = currentFocus ?: return false
+        return rv.findContainingItemView(f) != null
+    }
 
     private fun bindActions(app: AppInfo) {
         actPin.text = if (prefs.isFavorite(app.packageName)) "Unpin" else "Pin"
@@ -584,10 +600,23 @@ class LauncherActivity : AppCompatActivity() {
         empty.visibility = View.GONE
         val focused = currentFocus
         val focusInRow = focused != null && row.findContainingItemView(focused) != null
-        // Browsing the row (or nothing focused): land on the first card. On a tab: leave focus there.
-        if (focusInRow || focused == null) row.post { firstCard(row)?.requestFocus() }
+        // Browsing the row (or nothing focused): make sure a card holds focus. On a tab: leave focus there.
+        if (focusInRow || focused == null) row.post { if (!focusInside(row)) firstCard(row)?.requestFocus() }
         // Entering the tab shows its first item; a refresh mid-browse keeps the one in view.
-        if (!focusInRow || (heroItem as? AppInfo)?.let { it !in list } != false) onCardFocused(list[0])
+        keepOrResetHero(list, focusInRow)
+    }
+
+    /**
+     * After a list refresh the AppInfo objects are new, so match the hero by package: keep it
+     * (with fresh data) while the user is browsing, otherwise show the list's first item.
+     */
+    private fun keepOrResetHero(list: List<AppInfo>, browsing: Boolean) {
+        val cur = heroItem as? AppInfo
+        val match = if (browsing && cur != null) list.firstOrNull { it.packageName == cur.packageName } else null
+        when {
+            match == null -> onCardFocused(list[0])
+            match !== cur -> { heroItem = match; renderAppHero(match, animate = false) }
+        }
     }
 
     // ---------- home (TMDB) ----------

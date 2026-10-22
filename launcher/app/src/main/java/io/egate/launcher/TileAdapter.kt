@@ -36,5 +36,10 @@ class TileAdapter(
     override fun onViewRecycled(holder: VH) { Cards.reset(holder.card) }
     override fun getItemCount() = items.size
     fun item(position: Int): Tile? = items.getOrNull(position)
-    fun submit(newItems: List<Tile>) { items = newItems; notifyDataSetChanged() }
+    /** Same-size refreshes rebind in place (no item animator), so a focused tile keeps focus. */
+    fun submit(newItems: List<Tile>) {
+        val same = newItems.size == items.size
+        items = newItems
+        if (same) notifyItemRangeChanged(0, items.size) else notifyDataSetChanged()
+    }
 }
