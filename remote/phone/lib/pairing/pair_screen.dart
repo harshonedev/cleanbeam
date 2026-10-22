@@ -31,6 +31,7 @@ class _PairScreenState extends State<PairScreen> {
   Future<void> _detected(BarcodeCapture capture) async {
     if (_busy) return;
     for (final b in capture.barcodes) {
+      debugPrint('[egate] qr: ${b.rawValue?.substring(0, (b.rawValue?.length ?? 0).clamp(0, 40))}');
       final p = Pairing.fromQrJson(b.rawValue ?? '');
       if (p != null) {
         setState(() => _busy = true);

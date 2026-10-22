@@ -90,6 +90,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     Timer? graceTimer;
 
     void adopt(Transport t) {
+      debugPrint('[egate] connected over ${t.kind.name}');
       _attach(t);
       _attempt = 0;
       _connecting = false;
@@ -152,6 +153,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       host = null;
     }
     host ??= pairing.ip.isEmpty ? null : pairing.ip;
+    debugPrint('[egate] wifi: trying ${host ?? "(no host)"}');
     if (host == null || gen != _generation) return null;
     final t = makeWs(host);
     try {
@@ -163,6 +165,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       _activeHost = host;
       return t;
     } catch (e) {
+      debugPrint('[egate] wifi failed: $e');
       lastError = 'wifi: $e';
       await t.close();
       return null;
@@ -176,6 +179,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     } catch (_) {
       id = null;
     }
+    debugPrint('[egate] ble: scan result ${id ?? "(none)"}');
     if (id == null || gen != _generation) return null;
     final t = makeBle(id);
     try {
@@ -186,6 +190,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       }
       return t;
     } catch (e) {
+      debugPrint('[egate] ble failed: $e');
       lastError = 'ble: $e';
       await t.close();
       return null;
@@ -222,6 +227,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
   }
 
   void _onDropped() {
+    debugPrint('[egate] connection lost');
     _detach();
     lastError = 'connection lost';
     notifyListeners();

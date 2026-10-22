@@ -132,6 +132,8 @@
                 android:layout_marginTop="6dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="15sp"
+                android:maxLines="1"
+                android:ellipsize="end"
                 tools:text="Video app, version 3.0.412" />
 
             <TextView

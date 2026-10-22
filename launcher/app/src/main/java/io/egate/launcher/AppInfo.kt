@@ -1,5 +1,6 @@
 package io.egate.launcher
 
+import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 
 data class AppInfo(
@@ -7,6 +8,7 @@ data class AppInfo(
     val packageName: String,
     val icon: Drawable,
     val banner: Drawable?,      // leanback 16:9 banner when the app ships one
+    val ambient: Bitmap?,       // tiny blurred render of the art, for the room background
     val color: Int,             // dominant color from the icon/banner, for ambient tint
     val category: String?,      // "Video", "Game", ... from ApplicationInfo.category
     val version: String?,

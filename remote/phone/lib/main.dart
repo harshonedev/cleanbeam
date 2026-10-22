@@ -50,6 +50,7 @@ class _EGateRemoteAppState extends State<EGateRemoteApp> {
       );
 
   Future<void> _onPaired(Pairing p) async {
+    debugPrint('[egate] paired with ${p.name} at ${p.ip}:${p.port}');
     await _store.save(p);
     setState(() {
       _pairing = p;

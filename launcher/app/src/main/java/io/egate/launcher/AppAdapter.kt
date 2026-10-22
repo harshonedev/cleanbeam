@@ -64,7 +64,6 @@ class AppAdapter(
         card.setOnLongClickListener { onLongClick(app); true }
         card.setOnFocusChangeListener { v, hasFocus ->
             val scale = if (hasFocus) 1.12f else 1.0f
-            v.animate().cancel()
             v.animate().scaleX(scale).scaleY(scale)
                 .setDuration(if (hasFocus) 320 else 200)
                 .setInterpolator(if (hasFocus) overshoot else settle)
@@ -73,22 +72,25 @@ class AppAdapter(
             if (hasFocus) onFocus(app)
         }
 
+        val slot = holder.itemView
+        slot.animate().cancel()
         if (entrance && position < 7) {
-            card.alpha = 0f
-            card.translationX = dp(card, 56f)
-            card.animate().alpha(1f).translationX(0f)
+            slot.alpha = 0f
+            slot.translationX = dp(slot, 56f)
+            slot.animate().alpha(1f).translationX(0f)
                 .setStartDelay(60L + position * 55L).setDuration(420)
                 .setInterpolator(settle).start()
         } else {
-            card.alpha = 1f
-            card.translationX = 0f
+            slot.alpha = 1f
+            slot.translationX = 0f
         }
     }
 
     override fun onViewRecycled(holder: VH) {
         holder.card.animate().cancel()
+        holder.itemView.animate().cancel()
         holder.card.scaleX = 1f; holder.card.scaleY = 1f
-        holder.card.alpha = 1f; holder.card.translationX = 0f
+        holder.itemView.alpha = 1f; holder.itemView.translationX = 0f
     }
 
     override fun getItemCount(): Int = items.size

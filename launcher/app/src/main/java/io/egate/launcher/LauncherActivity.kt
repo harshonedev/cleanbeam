@@ -23,6 +23,7 @@ import android.os.Looper
 import android.os.StatFs
 import android.provider.Settings
 import android.text.format.DateUtils
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.animation.PathInterpolator
@@ -280,7 +281,7 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun ambientFor(app: AppInfo): Drawable? {
-        val bmp: Bitmap = AppRepository.ambientArt(app.banner ?: app.icon) ?: return null
+        val bmp: Bitmap = app.ambient ?: return null
         return BitmapDrawable(resources, bmp).apply { isFilterBitmap = true; alpha = 0x8C }
     }
 
@@ -328,7 +329,9 @@ class LauncherActivity : AppCompatActivity() {
     // ---------- apps ----------
     private fun reloadApps() {
         io.execute {
-            val apps = AppRepository.loadApps(this)
+            val apps = runCatching { AppRepository.loadApps(this) }
+                .onFailure { Log.e("EGate", "loadApps failed", it) }
+                .getOrDefault(allApps)
             handler.post {
                 allApps = apps
                 populateRow(animate = firstLoad)
@@ -381,18 +384,16 @@ class LauncherActivity : AppCompatActivity() {
     private fun renderHero(app: AppInfo, animate: Boolean) {
         val subtitle = buildString {
             append(app.category?.let { "$it app" } ?: "App")
-            app.version?.let { append(", version ").append(it) }
+            shortVersion(app.version)?.let { append(", version ").append(it) }
         }
         val meta = when {
             app.lastUsed > 0 -> {
-                val rel = DateUtils.getRelativeTimeSpanString(app.lastUsed, System.currentTimeMillis(),
-                    DateUtils.MINUTE_IN_MILLIS).toString().replaceFirstChar { it.lowercase() }
+                val rel = relative(app.lastUsed, DateUtils.MINUTE_IN_MILLIS)
                 val hrs = app.foregroundMs / 3_600_000
                 if (hrs >= 1) "Last opened $rel, ${hrs}h this month" else "Last opened $rel"
             }
             AppRepository.hasUsageAccess(this) -> "Not opened this month"
-            app.installTime > 0 -> "Installed " + DateUtils.getRelativeTimeSpanString(app.installTime,
-                System.currentTimeMillis(), DateUtils.DAY_IN_MILLIS).toString().replaceFirstChar { it.lowercase() }
+            app.installTime > 0 -> "Installed " + relative(app.installTime, DateUtils.DAY_IN_MILLIS)
             else -> ""
         }
         val apply = {
@@ -410,13 +411,22 @@ class LauncherActivity : AppCompatActivity() {
                 hero.animate().alpha(1f).translationY(0f).setDuration(320).setInterpolator(ease).start()
             }.start()
         }
-        if (wallpaperKey.isEmpty()) {
-            io.execute {
-                val art = ambientFor(app)
-                handler.post { if (heroApp === app) crossfadeArt(art) }
-            }
-        }
+        if (wallpaperKey.isEmpty()) crossfadeArt(ambientFor(app))
         animateTint(if (prefs.appGlow) app.color else prefs.accentColor)
+    }
+
+    /** "2 hours ago" / "yesterday" read mid-sentence; a date like "May 26" keeps its capital. */
+    private fun relative(time: Long, minRes: Long): String {
+        val s = DateUtils.getRelativeTimeSpanString(time, System.currentTimeMillis(), minRes).toString()
+        return if (s.endsWith("ago") || s.equals("yesterday", true) || s.equals("today", true))
+            s.replaceFirstChar { it.lowercase() } else s
+    }
+
+    /** Build suffixes like "-857911644-release" are noise on a TV. Keep the dotted part. */
+    private fun shortVersion(v: String?): String? {
+        if (v.isNullOrBlank()) return null
+        val core = v.trim().takeWhile { it.isDigit() || it == '.' }
+        return (if (core.length >= 3) core else v.trim()).take(24)
     }
 
     private fun launchApp(app: AppInfo) {

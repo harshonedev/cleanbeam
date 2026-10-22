@@ -1,0 +1,26 @@
+# Pair using the 6-digit PIN shown on the projector's "Remote pairing" screen.
+# maestro test -e PIN=123456 -e IP=192.168.10.55 maestro/pair_with_code.yaml
+appId: io.egate.remoteApp
+---
+- launchApp
+- assertVisible: "Pair with your projector"
+- takeScreenshot: pair_screen
+- tapOn: "Enter the 6-digit code instead"
+- extendedWaitUntil:
+    visible: "6-digit code"
+    timeout: 15000
+- takeScreenshot: pair_sheet
+- runFlow:
+    when:
+      visible: "Projector IP address"
+    commands:
+      - tapOn: "Projector IP address"
+      - inputText: ${IP}
+- tapOn: "6-digit code"
+- inputText: ${PIN}
+- hideKeyboard
+- tapOn: "Pair"
+- extendedWaitUntil:
+    visible: "Remote"
+    timeout: 20000
+- takeScreenshot: paired

@@ -51,6 +51,7 @@ object AppRepository {
                 packageName = pkg,
                 icon = icon,
                 banner = banner,
+                ambient = ambientArt(banner ?: icon),
                 color = dominantColor(banner ?: icon),
                 category = cat,
                 version = pi?.versionName,
@@ -115,13 +116,15 @@ object AppRepository {
     }
 
     /**
-     * Cheap "blur": render the art at a tiny size and let the ImageView upscale it with
-     * bilinear filtering. Works on every API level and costs nothing per frame.
+     * Cheap "blur": render the art at a tiny size, upscale it twice with bilinear filtering
+     * and let the ImageView stretch the result. Runs off the main thread before the drawable
+     * is attached to any view, so no view callbacks fire. Costs nothing per frame.
      */
-    fun ambientArt(d: Drawable): Bitmap? {
+    private fun ambientArt(d: Drawable): Bitmap? {
         val src = toBitmap(d, 256) ?: return null
         return try {
-            Bitmap.createScaledBitmap(src, 32, 18, true)
+            val tiny = Bitmap.createScaledBitmap(src, 14, 8, true)
+            Bitmap.createScaledBitmap(tiny, 112, 64, true).also { if (it !== tiny) tiny.recycle() }
         } catch (e: Exception) { null }
         finally { if (src !== (d as? BitmapDrawable)?.bitmap) src.recycle() }
     }
