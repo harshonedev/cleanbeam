@@ -18,6 +18,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelUuid
 import android.util.Log
 import io.egate.remote.protocol.Chunker
@@ -99,6 +101,9 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
     }
 
     private var stateReceiver: BroadcastReceiver? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var attempt = 0
+    private val retry = Runnable { openGatt() }
 
     /** Opens the GATT server now if Bluetooth is on, and (re)opens it whenever Bluetooth turns on later. */
     fun start() {
@@ -106,7 +111,7 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
             stateReceiver = object : BroadcastReceiver() {
                 override fun onReceive(c: Context, i: Intent) {
                     when (i.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
-                        BluetoothAdapter.STATE_ON -> { Log.i(TAG, "bluetooth on → restarting gatt"); closeGatt(); openGatt() }
+                        BluetoothAdapter.STATE_ON -> { Log.i(TAG, "bluetooth on → restarting gatt"); closeGatt(); attempt = 0; openGatt() }
                         BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_OFF -> closeGatt()
                     }
                 }
@@ -121,16 +126,34 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
         closeGatt()
     }
 
+    /**
+     * Brings the GATT server up in steps, each of which the stack can refuse right after boot while
+     * Bluetooth is still coming up (null server, refused service, no LE advertiser, advertise
+     * failure). Every refusal is retried with backoff instead of leaving BLE silently off until the
+     * next adapter toggle.
+     */
     private fun openGatt() {
+        handler.removeCallbacks(retry)
         val adapter = manager.adapter ?: run { Log.w(TAG, "no bluetooth adapter"); return }
         if (!adapter.isEnabled) { Log.w(TAG, "bluetooth disabled; will start when it turns on"); return }
-        if (gatt != null) return
-        gatt = manager.openGattServer(ctx, callback)?.also { it.addService(buildService()) }
-        advertiser = adapter.bluetoothLeAdvertiser
+        if (gatt == null) {
+            val g = manager.openGattServer(ctx, callback) ?: run { scheduleRetry("openGattServer returned null"); return }
+            gatt = g
+            if (!g.addService(buildService())) { closeGatt(); scheduleRetry("addService refused"); return }
+            return // advertising starts from onServiceAdded
+        }
         startAdvertising()
     }
 
+    private fun scheduleRetry(why: String) {
+        val delay = BleRetry.delayMs(attempt++)
+        Log.w(TAG, "ble bring-up: $why; retry in $delay ms")
+        status?.bluetooth = "unavailable"
+        handler.postDelayed(retry, delay)
+    }
+
     private fun closeGatt() {
+        handler.removeCallbacks(retry)
         status?.bluetooth = "off"
         try { advertiser?.stopAdvertising(adCallback) } catch (_: Exception) {}
         try { gatt?.close() } catch (_: Exception) {}
@@ -163,6 +186,8 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
     }
 
     private fun startAdvertising() {
+        val adv = manager.adapter?.bluetoothLeAdvertiser ?: run { scheduleRetry("no LE advertiser yet"); return }
+        advertiser = adv
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
@@ -175,21 +200,26 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
             .build()
         val scanResponse = AdvertiseData.Builder().setIncludeDeviceName(true).build()
         try {
-            advertiser?.startAdvertising(settings, data, scanResponse, adCallback)
+            adv.startAdvertising(settings, data, scanResponse, adCallback)
         } catch (e: SecurityException) {
             Log.e(TAG, "advertise needs BLUETOOTH_ADVERTISE", e)
         }
     }
 
     private val adCallback = object : AdvertiseCallback() {
-        override fun onStartSuccess(s: AdvertiseSettings) { Log.i(TAG, "ble advertising as $LOCAL_NAME"); status?.bluetooth = "advertising" }
+        override fun onStartSuccess(s: AdvertiseSettings) { Log.i(TAG, "ble advertising as $LOCAL_NAME"); attempt = 0; status?.bluetooth = "advertising" }
         override fun onStartFailure(code: Int) {
-            Log.w(TAG, "ble advertising failed: $code")
-            status?.bluetooth = if (code == AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED) "advertising" else "unavailable"
+            if (code == AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED) { status?.bluetooth = "advertising"; return }
+            scheduleRetry("advertising failed: $code")
         }
     }
 
     private val callback = object : BluetoothGattServerCallback() {
+        override fun onServiceAdded(status: Int, service: BluetoothGattService) {
+            if (status == BluetoothGatt.GATT_SUCCESS) startAdvertising()
+            else { closeGatt(); scheduleRetry("onServiceAdded status=$status") }
+        }
+
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 clients[device.address] = Client(device)
