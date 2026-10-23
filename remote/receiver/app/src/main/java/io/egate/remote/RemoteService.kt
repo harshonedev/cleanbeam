@@ -45,7 +45,22 @@ class RemoteService : Service() {
             }
         }
         val store = PairingStore.get(this)
-        apps = AppsHandler(this)
+        apps = AppsHandler(
+            this,
+            top = {
+                try {
+                    val r = injector.send("{\"t\":\"top\"}")
+                    org.json.JSONObject(r).optString("pkg", "").takeIf { it.isNotEmpty() }
+                } catch (e: Exception) { null }
+            },
+            start = { args ->
+                try {
+                    val r = injector.send(org.json.JSONObject().put("t", "start").put("args", args).toString())
+                    if (r.contains("\"err\"")) Log.w(TAG, "helper start $args → $r")
+                    !r.contains("\"err\"")
+                } catch (e: Exception) { Log.w(TAG, "helper start failed", e); false }
+            },
+        )
         val version = packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
         router = CommandRouter(store, { json -> injector.send(json) }, apps, WsServer.SERVICE_NAME, version, status)
         ws = WsServer(this, router, apps).also { runCatching { it.start() }.onFailure { e -> Log.e(TAG, "ws start failed", e) } }

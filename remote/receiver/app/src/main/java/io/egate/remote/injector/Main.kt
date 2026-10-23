@@ -57,6 +57,9 @@ object Main {
         }
     }
 
+    /** Only `-n pkg/cls`, `-a action`, `-c category` and `-f flags` with plain identifiers may reach `am start`. */
+    internal val SAFE_AM_ARGS = Regex("""(-[nacf] [A-Za-z0-9_./\$]+)( -[nacf] [A-Za-z0-9_./\$]+)*""")
+
     internal fun parseUid(args: Array<String>): Int? {
         val i = args.indexOf("--uid")
         if (i < 0 || i + 1 >= args.size) return null
@@ -82,6 +85,24 @@ object Main {
     internal fun handle(line: String, injector: InputInjector): String {
         val c = Codec.decodeCommand(line)
         if (c is Command.Unknown && c.t == "hello") return "{\"t\":\"hello_ok\",\"pid\":${Process.myPid()}}"
+        if (c is Command.Unknown && c.t == "start") {
+            // Starting an activity from the receiver's service is refused by Android whenever the
+            // receiver has no visible window ("Abort background activity starts"); `am start` from
+            // this shell/root process is not.
+            val o = org.json.JSONObject(line)
+            val args = o.optString("args", "")
+            if (args.isEmpty() || !SAFE_AM_ARGS.matches(args)) return "{\"t\":\"err\",\"msg\":\"bad start args\"}"
+            val out = try {
+                val p = Runtime.getRuntime().exec(arrayOf("sh", "-c", "am start $args 2>&1"))
+                val text = p.inputStream.bufferedReader().readText()
+                p.waitFor(); text
+            } catch (e: Exception) { "Error: $e" }
+            return if (out.contains("Error")) "{\"t\":\"err\",\"msg\":${org.json.JSONObject.quote(out.trim().take(200))}}" else "{\"t\":\"ok\"}"
+        }
+        if (c is Command.Unknown && c.t == "top") {
+            val pkg = TopActivity.current() ?: return "{\"t\":\"top\",\"pkg\":null}"
+            return "{\"t\":\"top\",\"pkg\":${org.json.JSONObject.quote(pkg)}}"
+        }
         val ok = when (c) {
             is Command.Key -> injector.key(c.code, c.action)
             is Command.Text -> injector.text(c.s)

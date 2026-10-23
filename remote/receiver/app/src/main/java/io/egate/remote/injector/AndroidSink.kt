@@ -1,5 +1,7 @@
 package io.egate.remote.injector
 
+import android.content.ClipData
+import android.os.IBinder
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.InputEvent
@@ -56,7 +58,11 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
         val source = if (code in KeyEvent.KEYCODE_DPAD_UP..KeyEvent.KEYCODE_DPAD_CENTER) InputDevice.SOURCE_DPAD else InputDevice.SOURCE_KEYBOARD
         val ev = KeyEvent(downTime, eventTime, action, code, 0, metaState, KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
             KeyEvent.FLAG_FROM_SYSTEM, source)
-        return inject(ev)
+        // Keys wait for the dispatcher like `input keyevent` does: HOME and other policy keys are
+        // handled on the up event and need the down delivered first. Pointer events stay async.
+        val ok = inject(ev, INJECT_MODE_WAIT_FOR_RESULT)
+        if (!ok) System.err.println("inject key $code ${if (down) "down" else "up"} rejected")
+        return ok
     }
 
     override fun motion(action: Int, x: Float, y: Float, buttonState: Int, vScroll: Float): Boolean {
@@ -85,6 +91,51 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
         return ok
     }
 
+    /**
+     * Clipboard-and-paste for text the key map cannot type. Uses the hidden IClipboard binder as
+     * com.android.shell (this process is spawned by adbd, so it is uid shell or root; shell holds
+     * READ_CLIPBOARD_IN_BACKGROUND, which is what lets a non-focused caller set the clip). The
+     * focused field then receives KEYCODE_PASTE, which TextView turns into an insert.
+     */
+    private val clipboard: Clipboard? by lazy { Clipboard.open().also { System.err.println(if (it != null) "clipboard: ok" else "clipboard: unavailable") } }
+
+    override fun paste(text: String): Boolean {
+        val c = clipboard ?: return false
+        if (!c.set(text)) return false
+        val t = now()
+        return key(KeyEvent.KEYCODE_PASTE, true, t, t, 0) and key(KeyEvent.KEYCODE_PASTE, false, t, t, 0)
+    }
+
+    private class Clipboard private constructor(private val service: Any, private val setMethod: Method) {
+        fun set(text: String): Boolean = try {
+            val clip = ClipData.newPlainText("egate-remote", text)
+            val args: Array<Any?> = when (setMethod.parameterTypes.size) {
+                2 -> arrayOf(clip, SHELL_PKG)                      // < 29
+                3 -> arrayOf(clip, SHELL_PKG, 0)                   // 29-30: (clip, pkg, userId)
+                4 -> arrayOf(clip, SHELL_PKG, null, 0)             // 31-33: (clip, pkg, attributionTag, userId)
+                else -> arrayOf(clip, SHELL_PKG, null, 0, 0)       // 34+: + deviceId
+            }
+            setMethod.invoke(service, *args); true
+        } catch (t: Throwable) {
+            System.err.println("clipboard set failed: ${t.cause ?: t}"); false
+        }
+
+        companion object {
+            private const val SHELL_PKG = "com.android.shell"
+            fun open(): Clipboard? = try {
+                val sm = Class.forName("android.os.ServiceManager")
+                val binder = sm.getMethod("getService", String::class.java).invoke(null, "clipboard") as IBinder
+                val stub = Class.forName("android.content.IClipboard\$Stub")
+                val service = stub.getMethod("asInterface", IBinder::class.java).invoke(null, binder)!!
+                val m = service.javaClass.methods.filter { it.name == "setPrimaryClip" }.minByOrNull { it.parameterTypes.size }
+                    ?: throw NoSuchMethodException("setPrimaryClip")
+                Clipboard(service, m)
+            } catch (t: Throwable) {
+                System.err.println("clipboard unavailable: $t"); null
+            }
+        }
+    }
+
     override fun exec(cmd: String) {
         try {
             Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd)).waitFor()
@@ -98,10 +149,11 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
         return events.filter { it.action == KeyEvent.ACTION_DOWN }.map { InputInjector.KeyStroke(it.keyCode, it.metaState) }
     }
 
-    private fun inject(ev: InputEvent): Boolean =
-        try { injectMethod.invoke(inputManager, ev, INJECT_MODE_ASYNC) as Boolean } catch (t: Throwable) { false }
+    private fun inject(ev: InputEvent, mode: Int = INJECT_MODE_ASYNC): Boolean =
+        try { injectMethod.invoke(inputManager, ev, mode) as Boolean } catch (t: Throwable) { System.err.println("inject failed: ${t.cause ?: t}"); false }
 
     companion object {
         private const val INJECT_MODE_ASYNC = 0
+        private const val INJECT_MODE_WAIT_FOR_RESULT = 1
     }
 }

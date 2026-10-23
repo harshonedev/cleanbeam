@@ -2,7 +2,6 @@ package io.egate.remote
 
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.widget.Button
 import android.widget.ImageView
@@ -12,8 +11,6 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import org.json.JSONObject
-import java.net.Inet4Address
-import java.net.NetworkInterface
 
 /** Full-screen pairing page: QR with the long token, plus a short-lived 6-digit PIN. */
 class PairingActivity : AppCompatActivity() {
@@ -66,7 +63,7 @@ class PairingActivity : AppCompatActivity() {
     }
 
     private fun render() {
-        val address = wifiIp()
+        val address = Net.ipv4(this)
         val payload = JSONObject()
             .put("v", 1)
             .put("name", io.egate.remote.transport.WsServer.SERVICE_NAME)
@@ -77,19 +74,6 @@ class PairingActivity : AppCompatActivity() {
         qr.setImageBitmap(encodeQr(payload, 420))
         pin.text = store.pairingPin?.let { it.substring(0, 3) + " " + it.substring(3) } ?: ""
         ip.text = address ?: "no Wi-Fi"
-    }
-
-    private fun wifiIp(): String? {
-        val wm = applicationContext.getSystemService(WIFI_SERVICE) as? WifiManager
-        @Suppress("DEPRECATION")
-        val raw = wm?.connectionInfo?.ipAddress ?: 0
-        if (raw != 0) {
-            return "%d.%d.%d.%d".format(raw and 0xff, raw shr 8 and 0xff, raw shr 16 and 0xff, raw shr 24 and 0xff)
-        }
-        return NetworkInterface.getNetworkInterfaces()?.toList()
-            ?.flatMap { it.inetAddresses.toList() }
-            ?.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
-            ?.hostAddress
     }
 
     private fun encodeQr(text: String, size: Int): Bitmap {

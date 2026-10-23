@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.IOException
 
-private class FakeChannel(private val replyWith: String = "{\"t\":\"ok\"}") : InjectorClient.LineChannel {
+private open class FakeChannel(private val replyWith: String = "{\"t\":\"ok\"}") : InjectorClient.LineChannel {
     var closed = false
     var failNext = false
     val sent = mutableListOf<String>()
@@ -75,6 +75,34 @@ class InjectorClientTest {
             throw AssertionError("expected IOException")
         } catch (e: IOException) {
             // expected
+        }
+    }
+}
+
+class InjectorTimeoutTest {
+    @Test
+    fun `a read timeout drops the channel and does not replay the command`() {
+        var connects = 0
+        val channels = mutableListOf<FakeChannel>()
+        var timeoutsLeft = 1
+        val connector = object : InjectorClient.Connector {
+            override fun connect(): InjectorClient.LineChannel? { connects++; return TimeoutOnce { timeoutsLeft-- > 0 }.also { channels += it } }
+        }
+        val c = InjectorClient(object : InjectorClient.Spawner { override fun spawn() {} }, connector, retryDelayMs = 0, spawnTimeoutMs = 0)
+        try { c.send("slow"); throw AssertionError("expected IOException") } catch (e: IOException) {
+            assertEquals(true, e.message!!.contains("timed out"))
+        }
+        assertEquals(1, connects)                       // no immediate reconnect/replay
+        assertEquals(listOf("slow"), channels[0].sent)  // sent once only
+        assertEquals(true, channels[0].closed)
+        assertEquals("{\"t\":\"ok\"}", c.send("next")) // lazily reconnects for the next command
+        assertEquals(2, connects)
+    }
+
+    private class TimeoutOnce(private val shouldTimeout: () -> Boolean) : FakeChannel() {
+        override fun send(line: String): String {
+            if (shouldTimeout()) { sent += line; throw java.net.SocketTimeoutException("read timed out") }
+            return super.send(line)
         }
     }
 }

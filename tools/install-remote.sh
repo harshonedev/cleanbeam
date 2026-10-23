@@ -13,6 +13,9 @@ adb shell pm grant $PKG android.permission.BLUETOOTH_CONNECT || true
 adb shell pm grant $PKG android.permission.BLUETOOTH_ADVERTISE || true
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
 adb shell appops set $PKG GET_USAGE_STATS allow
-adb shell am start-foreground-service $PKG/.RemoteService
+# A reinstall keeps the app uid, so a helper from the previous build would keep answering on the
+# same socket; kill it so the new APK's helper is spawned. Opening the pairing screen starts the
+# service (am start-foreground-service needs root; adbd is uid shell after a cold boot).
+adb shell "pkill -f 'injector.[M]ain'" || true
 adb shell am start -n $PKG/.PairingActivity
 echo "installed. token:"; adb shell "cat /data/data/$PKG/shared_prefs/pairing.xml 2>/dev/null | grep -o 'token\">[^<]*' | cut -d'>' -f2" || true

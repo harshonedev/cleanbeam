@@ -17,6 +17,8 @@ private class RecordingSink : InputInjector.Sink {
         calls += "motion($action,${x.toInt()},${y.toInt()},$buttonState,${vScroll.toInt()})"; return true
     }
     override fun exec(cmd: String) { calls += "exec($cmd)" }
+    var canPaste = false
+    override fun paste(text: String): Boolean { if (!canPaste) return false; calls += "paste($text)"; return true }
 }
 
 /** Maps only ASCII letters; everything else is "unmappable" like an emoji would be. */
@@ -61,6 +63,17 @@ class InjectorCommandTest {
         inj.text("a😀b")
         assertEquals(
             listOf("key(29,down,1000,0)", "key(29,up,1000,0)", "exec(input text '😀')", "key(30,down,1000,0)", "key(30,up,1000,0)"),
+            sink.calls
+        )
+    }
+
+    @Test
+    fun `unmappable runs are pasted when the sink can, between typed keys`() {
+        val (inj, sink) = make()
+        sink.canPaste = true
+        inj.text("aनमस्ते😀b")
+        assertEquals(
+            listOf("key(29,down,1000,0)", "key(29,up,1000,0)", "paste(नमस्ते😀)", "key(30,down,1000,0)", "key(30,up,1000,0)"),
             sink.calls
         )
     }

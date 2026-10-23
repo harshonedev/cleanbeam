@@ -9,6 +9,7 @@ import java.io.Closeable
 import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStream
+import java.net.SocketTimeoutException
 
 /**
  * App-side handle to the injector helper. Connects to its LocalSocket; if that is refused,
@@ -18,7 +19,7 @@ class InjectorClient(
     private val spawner: Spawner,
     private val connector: Connector,
     private val retryDelayMs: Long = 200,
-    private val spawnTimeoutMs: Long = 8_000,
+    private val spawnTimeoutMs: Long = 20_000, // first start of a new APK takes ~5 s of dex verification on this box
     private val cooldownMs: Long = 10_000,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
@@ -35,6 +36,11 @@ class InjectorClient(
         val ch = channel ?: ensureConnected()
         return try {
             ch.send(json)
+        } catch (e: SocketTimeoutException) {
+            // The helper is still working (a long text, a wedged inject). Re-sending would replay
+            // the command, so give up on this one and reconnect lazily on the next.
+            dropChannel()
+            throw IOException("injector unavailable (timed out)")
         } catch (e: IOException) {
             dropChannel()
             ensureConnected().send(json)
@@ -90,7 +96,7 @@ class InjectorClient(
                 override fun connect(): LineChannel? = try {
                     val s = LocalSocket()
                     s.connect(LocalSocketAddress(Main.socketName(appUid), LocalSocketAddress.Namespace.ABSTRACT))
-                    s.soTimeout = 3_000 // a wedged helper must not block every later command
+                    s.soTimeout = 8_000 // a wedged helper must not block forever; a 400-char paste types synchronously in ~2 s
                     val peer = s.peerCredentials.uid
                     if (!isTrustedHelperUid(peer)) {
                         Log.w(TAG, "injector socket owned by untrusted uid $peer; refusing")

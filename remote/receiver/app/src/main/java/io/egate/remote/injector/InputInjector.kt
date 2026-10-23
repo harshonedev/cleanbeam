@@ -14,6 +14,8 @@ class InputInjector(private val sink: Sink, private val mapper: CharMapper) {
         fun key(code: Int, down: Boolean, downTime: Long, eventTime: Long, metaState: Int): Boolean
         fun motion(action: Int, x: Float, y: Float, buttonState: Int, vScroll: Float): Boolean
         fun exec(cmd: String)
+        /** Types [text] by putting it on the clipboard and pressing Paste; false when that path is unavailable. */
+        fun paste(text: String): Boolean = false
     }
 
     data class KeyStroke(val code: Int, val metaState: Int)
@@ -48,7 +50,10 @@ class InputInjector(private val sink: Sink, private val mapper: CharMapper) {
         val pending = StringBuilder()
         fun flush() {
             if (pending.isNotEmpty()) {
-                sink.exec("input text " + shellQuote(pending.toString()))
+                // Characters the virtual keyboard cannot produce (emoji, Devanagari, accents):
+                // paste them; `input text` is the last resort and only handles ASCII itself.
+                val run = pending.toString()
+                if (!sink.paste(run)) sink.exec("input text " + shellQuote(run))
                 pending.setLength(0)
             }
         }

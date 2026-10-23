@@ -59,6 +59,24 @@ class MessageTest {
     }
 
     @Test
+    fun `decodes shortcuts and open`() {
+        assertEquals(Command.Shortcuts, Codec.decodeCommand("""{"t":"shortcuts"}"""))
+        assertEquals(Command.Open("wifi"), Codec.decodeCommand("""{"t":"open","id":"wifi"}"""))
+        assertEquals(Command.Open(""), Codec.decodeCommand("""{"t":"open"}"""))
+    }
+
+    @Test
+    fun `encodes shortcuts list and optional ip`() {
+        assertEquals(
+            """{"t":"shortcuts","items":[{"id":"input","label":"Input source","group":"Projector"}]}""",
+            Codec.encodeEvent(Event.Shortcuts(listOf(ShortcutItem("input", "Input source", "Projector"))))
+        )
+        assertEquals("""{"t":"auth_ok","name":"n","version":"1","ip":"10.0.0.2"}""", Codec.encodeEvent(Event.AuthOk("n", "1", "10.0.0.2")))
+        assertEquals("""{"t":"status","app":null,"screenOn":false,"volume":0,"maxVolume":15,"ip":"10.0.0.2"}""",
+            Codec.encodeEvent(Event.Status(null, false, 0, 15, "10.0.0.2")))
+    }
+
+    @Test
     fun `encodes auth_ok, pair_ok, pong and err`() {
         assertEquals("""{"t":"auth_ok","name":"EGate Atom3X","version":"1.0"}""", Codec.encodeEvent(Event.AuthOk("EGate Atom3X", "1.0")))
         assertEquals("""{"t":"pair_ok","token":"abc","name":"EGate Atom3X"}""", Codec.encodeEvent(Event.PairOk("abc", "EGate Atom3X")))

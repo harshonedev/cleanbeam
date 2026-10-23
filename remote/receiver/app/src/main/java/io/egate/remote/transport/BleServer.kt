@@ -50,8 +50,14 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
         })
         @Volatile var sending = false
 
+        /**
+         * Queues every chunk of one message contiguously. The ws thread (replies) and the status
+         * scheduler (pushes) both send to a BLE client; without the lock their chunks interleave and
+         * the phone's assembler drops both messages on the sequence mismatch (the apps list went
+         * missing over Bluetooth whenever a status push landed mid-list).
+         */
         fun enqueue(bytes: ByteArray) {
-            for (c in Chunker.split(bytes, mtu)) outbox.put(c)
+            synchronized(outbox) { for (c in Chunker.split(bytes, mtu)) outbox.put(c) }
             pump()
         }
 
@@ -75,7 +81,13 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
                         } else if (status == android.bluetooth.BluetoothStatusCodes.ERROR_GATT_WRITE_REQUEST_BUSY && busyRetries++ < 20) {
                             Thread.sleep(20) // stack still busy with the previous notification; keep the chunk
                         } else {
-                            Log.w(TAG, "notify failed status=$status; dropping ${outbox.size} chunks"); outbox.clear(); break
+                            Log.w(TAG, "notify failed status=$status; dropping ${outbox.size} chunks"); outbox.clear()
+                            if (status == BLE_DEVICE_NOT_CONNECTED) {
+                                // No disconnect callback came (phone process killed mid-link); forget it now
+                                // so the pairing screen and status pushes stop counting a dead phone.
+                                if (clients.remove(device.address, this)) { connection.onClosed(); startAdvertising() }
+                            }
+                            break
                         }
                     }
                 } finally {
@@ -221,6 +233,8 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
 
     companion object {
         private const val TAG = "EGateRemote"
+        /** BluetoothStatusCodes.ERROR_DEVICE_NOT_CONNECTED (not exposed as a public constant on API 33). */
+        private const val BLE_DEVICE_NOT_CONNECTED = 4
         const val LOCAL_NAME = "EGate Remote"
         val SERVICE_UUID: UUID = UUID.fromString("b6517522-6d7b-49d2-8488-664819daea01")
         val CMD_UUID: UUID = UUID.fromString("b6517522-6d7b-49d2-8488-664819daea02")

@@ -2,6 +2,9 @@ package io.egate.remote.router
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.util.Log
+import io.egate.remote.Net
+import io.egate.remote.protocol.ShortcutItem
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -14,7 +17,18 @@ import android.os.PowerManager
 import io.egate.remote.protocol.AppItem
 import java.io.ByteArrayOutputStream
 
-class AppsHandler(private val ctx: Context) : AppsProvider {
+/**
+ * @param top asks the injector helper for the focused package (`{"t":"top"}`); null when it cannot say.
+ */
+/**
+ * @param start runs `am start <args>` in the helper; returns true on success, false when the helper
+ *   cannot (then the receiver tries startActivity itself, which only works while its own window is visible).
+ */
+class AppsHandler(
+    private val ctx: Context,
+    private val top: () -> String? = { null },
+    private val start: (args: String) -> Boolean = { false },
+) : AppsProvider {
 
     private val pm: PackageManager get() = ctx.packageManager
 
@@ -37,26 +51,64 @@ class AppsHandler(private val ctx: Context) : AppsProvider {
     override fun launch(pkg: String): Boolean {
         val intent = pm.getLeanbackLaunchIntentForPackage(pkg) ?: pm.getLaunchIntentForPackage(pkg) ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        return try { ctx.startActivity(intent); true } catch (e: Exception) { false }
+        return startViaHelper(intent) || try { ctx.startActivity(intent); true } catch (e: Exception) { false }
+    }
+
+    /** `am start -n pkg/cls` or `-a action`, run by the helper (shell) so it works while any app is in front. */
+    private fun startViaHelper(intent: Intent): Boolean {
+        val comp = intent.component
+        val args = when {
+            comp != null -> "-n ${comp.packageName}/${comp.className}"
+            intent.action != null -> "-a ${intent.action}"
+            else -> return false
+        }
+        val flags = intent.flags and (Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        return start("$args -f 0x${Integer.toHexString(flags)}")
     }
 
     private var lastForeground: String? = null
-    private var lastForegroundScan = 0L
+    private var loggedEmpty = false
 
-    /** Scans only the usage events since the previous scan (first scan: last 10 minutes). */
+    /**
+     * Most recent ACTIVITY_RESUMED in the last few minutes. The window is re-read every time rather
+     * than scanned incrementally: UsageStatsService returns nothing at all when the query starts
+     * after its newest event, which an incremental scan hits on every idle poll. Falls back to the
+     * package with the newest lastTimeUsed when the event log is empty for this caller.
+     */
     override fun foregroundApp(): String? {
+        top()?.let { lastForeground = it; return it }
         val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val now = System.currentTimeMillis()
-        val from = if (lastForegroundScan == 0L) now - 10 * 60 * 1000 else lastForegroundScan - 1000
-        val events = usm.queryEvents(from, now)
+        val events = usm.queryEvents(now - EVENT_WINDOW_MS, now + 1000)
         val ev = UsageEvents.Event()
+        var newest: String? = null
+        var newestTs = 0L
+        var count = 0
         while (events.hasNextEvent()) {
             events.getNextEvent(ev)
-            if (ev.eventType == UsageEvents.Event.ACTIVITY_RESUMED) lastForeground = ev.packageName
+            count++
+            if (ev.eventType == UsageEvents.Event.ACTIVITY_RESUMED && ev.timeStamp >= newestTs) {
+                newest = ev.packageName; newestTs = ev.timeStamp
+            }
         }
-        lastForegroundScan = now
+        if (newest == null) {
+            if (!loggedEmpty) { loggedEmpty = true; Log.w(TAG, "usage events: $count in window, no ACTIVITY_RESUMED; using usage stats") }
+            newest = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - STATS_WINDOW_MS, now)
+                ?.filter { it.lastTimeUsed > 0 && it.packageName != ctx.packageName }
+                ?.maxByOrNull { it.lastTimeUsed }?.packageName
+        }
+        if (newest != null) lastForeground = newest
         return lastForeground
     }
+
+    override fun shortcuts(): List<ShortcutItem> = Shortcuts.available(ctx).map { it.first.item() }
+
+    override fun open(id: String): Boolean {
+        val intent = Shortcuts.byId(id)?.resolve(ctx) ?: return false
+        return startViaHelper(intent) || try { ctx.startActivity(intent); true } catch (e: Exception) { Log.w(TAG, "open $id failed", e); false }
+    }
+
+    override fun ip(): String? = Net.ipv4(ctx)
 
     override fun volume(): Pair<Int, Int> {
         val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -80,6 +132,9 @@ class AppsHandler(private val ctx: Context) : AppsProvider {
     }
 
     companion object {
+        private const val TAG = "EGateRemote"
+        private const val EVENT_WINDOW_MS = 5 * 60 * 1000L
+        private const val STATS_WINDOW_MS = 6 * 60 * 60 * 1000L
         private val HIDDEN = setOf("io.egate.remote", "io.egate.launcher", "com.jixin.launcher5")
     }
 }

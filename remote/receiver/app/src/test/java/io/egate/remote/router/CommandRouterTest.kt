@@ -1,6 +1,7 @@
 package io.egate.remote.router
 
 import io.egate.remote.protocol.AppItem
+import io.egate.remote.protocol.ShortcutItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,6 +21,11 @@ private class FakeApps : AppsProvider {
     override fun foregroundApp(): String? = "io.egate.launcher"
     override fun volume(): Pair<Int, Int> = 7 to 15
     override fun screenOn(): Boolean = true
+    val opened = mutableListOf<String>()
+    var ipValue: String? = null
+    override fun shortcuts() = listOf(ShortcutItem("input", "Input source", "Projector"), ShortcutItem("wifi", "Wi-Fi", "Network"))
+    override fun open(id: String): Boolean { if (id != "input" && id != "wifi") return false; opened += id; return true }
+    override fun ip(): String? = ipValue
 }
 
 private class FakeCredentials(override val token: String = "TOKEN") : Credentials {
@@ -131,6 +137,52 @@ class CommandRouterTest {
         c.onMessage("""{"t":"ping"}""")
         assertEquals("""{"t":"status","app":"io.egate.launcher","screenOn":true,"volume":7,"maxVolume":15}""", s.sent[1])
         assertEquals("""{"t":"pong"}""", s.sent[2])
+    }
+
+    @Test
+    fun `shortcuts lists what the box can open and open fires it`() {
+        val (c, s) = authed()
+        c.onMessage("""{"t":"shortcuts"}""")
+        assertEquals("""{"t":"shortcuts","items":[{"id":"input","label":"Input source","group":"Projector"},{"id":"wifi","label":"Wi-Fi","group":"Network"}]}""", s.sent[1])
+        c.onMessage("""{"t":"open","id":"input"}""")
+        assertEquals(listOf("input"), apps.opened)
+        assertEquals(2, s.sent.size) // success is silent
+        c.onMessage("""{"t":"open","id":"nope"}""")
+        assertEquals("""{"t":"err","msg":"cannot open nope"}""", s.sent[2])
+    }
+
+    @Test
+    fun `auth_ok and status carry the projector ip when known`() {
+        apps.ipValue = "192.168.10.56"
+        val (c, s) = authed()
+        assertEquals("""{"t":"auth_ok","name":"EGate Atom3X","version":"1.0","ip":"192.168.10.56"}""", s.sent[0])
+        c.onMessage("""{"t":"status"}""")
+        assertEquals("""{"t":"status","app":"io.egate.launcher","screenOn":true,"volume":7,"maxVolume":15,"ip":"192.168.10.56"}""", s.sent[1])
+    }
+
+    @Test
+    fun `over-long text is refused without reaching the injector`() {
+        val (c, s) = authed()
+        val long = "a".repeat(CommandRouter.MAX_TEXT_CHARS + 1)
+        c.onMessage("""{"t":"text","s":"$long"}""")
+        assertTrue(injected.isEmpty())
+        assertTrue(s.sent[1].startsWith("""{"t":"err","msg":"text too long"""))
+        c.onMessage("""{"t":"text","s":"${"a".repeat(CommandRouter.MAX_TEXT_CHARS)}"}""")
+        assertEquals(1, injected.size)
+    }
+
+    @Test
+    fun `keys still held when the link drops are released`() {
+        val (c, _) = authed()
+        c.onMessage("""{"t":"key","code":24,"action":"down"}""")
+        c.onMessage("""{"t":"key","code":20,"action":"down"}""")
+        c.onMessage("""{"t":"key","code":20,"action":"up"}""")
+        c.onMessage("""{"t":"key","code":23,"action":"tap"}""")
+        injected.clear()
+        c.onClosed()
+        assertEquals(listOf("""{"t":"key","code":24,"action":"up"}"""), injected)
+        c.onClosed() // idempotent
+        assertEquals(1, injected.size)
     }
 
     @Test
