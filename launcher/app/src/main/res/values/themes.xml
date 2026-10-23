@@ -1,17 +1,20 @@
 <resources>
     <style name="Theme.EGate" parent="Theme.AppCompat.NoActionBar">
-        <item name="android:windowBackground">@drawable/bg_gradient</item>
+        <!-- Launch splash only: the activity paints its own background and drops this one. -->
+        <item name="android:windowBackground">@color/bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowFullscreen">true</item>
-        <item name="android:alertDialogTheme">@style/Theme.EGate.Dialog</item>
+        <item name="android:fontFamily">@font/outfit_regular</item>
+        <item name="android:textViewStyle">@style/Widget.EGate.TextView</item>
+        <item name="android:editTextStyle">@style/Widget.EGate.EditText</item>
     </style>
 
-    <style name="Theme.EGate.Dialog" parent="Theme.AppCompat.Dialog.Alert">
-        <item name="android:windowBackground">@drawable/dialog_bg</item>
-        <item name="android:textColorPrimary">@color/text_primary</item>
-        <item name="android:textColor">@color/text_primary</item>
-        <item name="android:windowMinWidthMajor">46%</item>
-        <item name="android:windowMinWidthMinor">46%</item>
+    <style name="Widget.EGate.TextView" parent="android:Widget.TextView">
+        <item name="android:fontFamily">@font/outfit_regular</item>
+    </style>
+
+    <style name="Widget.EGate.EditText" parent="Widget.AppCompat.EditText">
+        <item name="android:fontFamily">@font/outfit_regular</item>
     </style>
 
     <style name="Tab">
@@ -26,6 +29,6 @@
         <item name="android:textColor">@color/text_secondary</item>
         <item name="android:textSize">15sp</item>
         <item name="android:letterSpacing">0.04</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:fontFamily">@font/outfit_medium</item>
     </style>
 </resources>

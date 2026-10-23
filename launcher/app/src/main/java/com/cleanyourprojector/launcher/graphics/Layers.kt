@@ -10,12 +10,12 @@ import android.graphics.drawable.GradientDrawable
 /**
  * Gradient layers as tiny bitmaps.
  *
- * The box's Mali-450 evaluates a gradient shader per pixel, and the launcher stacks four of them
- * over the whole screen; each one measured ~5-6 ms of GPU time per frame, while a full-screen
- * bitmap measured none. A gradient that varies along one axis is drawn into a strip one pixel
- * wide and stretched across the view: bilinear sampling of a linear ramp reproduces the ramp
- * exactly, so the pixels match the shader. A diagonal gradient is drawn at a quarter of the
- * screen size for the same reason.
+ * The box's Mali-450 evaluates a gradient shader per pixel, and the Ambient theme stacks four
+ * of them over the whole screen; each one measured ~5-6 ms of GPU time per frame, while a
+ * full-screen bitmap measured none. A gradient that varies along one axis is drawn into a strip
+ * one pixel wide and stretched across the view: bilinear sampling of a linear ramp reproduces
+ * the ramp exactly, so the pixels match the shader. A diagonal gradient is drawn at a quarter of
+ * the screen size for the same reason.
  */
 object Layers {
 
@@ -43,7 +43,7 @@ object Layers {
 
     private var cardScrimBitmap: Bitmap? = null
 
-    /** The dark strip under a card's name, drawn once and shared by every card. */
+    /** The dark strip under a title card's name, drawn once and shared by every card. */
     fun cardScrim(res: Resources, heightPx: Int): BitmapDrawable {
         val bmp = cardScrimBitmap?.takeIf { it.height == heightPx }
             ?: render(GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,

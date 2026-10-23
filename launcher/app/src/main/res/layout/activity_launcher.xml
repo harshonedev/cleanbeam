@@ -5,11 +5,20 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_gradient">
+    android:background="@color/bg">
 
-    <!-- ambient art: two layers crossfade when the focused app changes -->
+    <!-- the theme's one picture (flat themes leave it empty) and a flat dim over it -->
     <ImageView
-        android:id="@+id/bg_a"
+        android:id="@+id/bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0"
+        android:contentDescription="@null" />
+
+    <!-- Ambient theme only: the focused item's art, two layers that crossfade, a colour tint, scrims -->
+    <ImageView
+        android:id="@+id/art_a"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
@@ -17,7 +26,7 @@
         android:contentDescription="@null" />
 
     <ImageView
-        android:id="@+id/bg_b"
+        android:id="@+id/art_b"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
@@ -27,19 +36,27 @@
     <View
         android:id="@+id/tint"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:visibility="invisible" />
 
     <View
         android:id="@+id/scrim_left_v"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/scrim_left" />
+        android:visibility="gone" />
 
     <View
         android:id="@+id/scrim_bottom_v"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/scrim_bottom" />
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/dim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:alpha="0" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -90,7 +107,7 @@
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="@font/outfit_medium"
                 tools:text="9:26 PM" />
 
             <ImageView
@@ -139,7 +156,7 @@
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_primary"
                 android:textSize="48sp"
-                android:fontFamily="sans-serif-black"
+                android:fontFamily="@font/outfit_bold"
                 android:letterSpacing="-0.02"
                 android:lineSpacingMultiplier="0.95"
                 android:maxLines="2"
@@ -155,16 +172,7 @@
                 android:textSize="15sp"
                 android:maxLines="1"
                 android:ellipsize="end"
-                tools:text="Video app, version 3.0.412" />
-
-            <TextView
-                android:id="@+id/hero_meta"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/text_secondary"
-                android:textSize="15sp"
-                tools:text="Last opened 2 hours ago" />
+                tools:text="Video app" />
 
             <TextView
                 android:id="@+id/hero_body"
@@ -190,7 +198,6 @@
             android:clipToPadding="false"
             android:paddingStart="47dp"
             android:paddingEnd="40dp"
-            android:paddingBottom="400dp"
             android:visibility="gone"
             app:layout_constraintTop_toTopOf="@id/shelf_top"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -237,7 +244,7 @@
                 android:text="@string/empty_favorites"
                 android:textColor="@color/text_primary"
                 android:textSize="18sp"
-                android:fontFamily="sans-serif-medium" />
+                android:fontFamily="@font/outfit_medium" />
 
             <TextView
                 android:id="@+id/empty_hint"
@@ -249,19 +256,12 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
-
-        <TextView
-            android:id="@+id/stats"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="56dp"
-            android:textColor="@color/text_muted"
-            android:textSize="12sp"
-            android:visibility="gone"
-            android:layout_marginBottom="26dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            tools:text="RAM 1.2G free   Storage 9G free" />
-
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- every menu: slides in from the right edge, over everything else -->
+    <com.cleanyourprojector.launcher.ui.SidePanel
+        android:id="@+id/panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
 </FrameLayout>

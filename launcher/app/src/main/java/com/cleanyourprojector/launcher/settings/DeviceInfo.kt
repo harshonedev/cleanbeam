@@ -7,9 +7,8 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
-import java.net.Inet4Address
 
-/** One-line live state for the Settings tiles. Every call is cheap and never throws. */
+/** One-line live state for the Settings tiles, in words a viewer understands. Never throws. */
 object DeviceInfo {
 
     fun wifi(context: Context): String {
@@ -23,13 +22,12 @@ object DeviceInfo {
         val info = runCatching { wm.connectionInfo }.getOrNull()
         // The SSID is redacted to "<unknown ssid>" unless the app holds a location permission.
         val ssid = info?.ssid?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && !it.startsWith("<unknown") && it != "0x" }
-        val ip = cm.getLinkProperties(net)?.linkAddresses?.firstOrNull { it.address is Inet4Address }?.address?.hostAddress
         val bars = info?.rssi?.takeIf { it != -127 }?.let { rssi ->
             val level = if (Build.VERSION.SDK_INT >= 30) wm.calculateSignalLevel(rssi) else @Suppress("DEPRECATION") WifiManager.calculateSignalLevel(rssi, 5)
             val max = if (Build.VERSION.SDK_INT >= 30) wm.maxSignalLevel else 4
             listOf("Weak", "Fair", "Good", "Strong", "Excellent")[(level * 4 / max.coerceAtLeast(1)).coerceIn(0, 4)] + " signal"
         }
-        return listOfNotNull(ssid ?: "Connected", ip, bars).joinToString("  ·  ")
+        return listOfNotNull(ssid ?: "Connected", bars).joinToString("  ·  ")
     }
 
     fun bluetooth(context: Context): String {
@@ -39,15 +37,12 @@ object DeviceInfo {
         val bonded = runCatching { adapter.bondedDevices.toList() }.getOrNull() ?: return "On"
         if (bonded.isEmpty()) return "On  ·  nothing paired"
         val connected = bonded.filter { isConnected(it) }
-        val name = { d: BluetoothDevice -> runCatching { d.name }.getOrNull()?.takeIf { it.isNotBlank() } ?: d.address }
+        val name = { d: BluetoothDevice -> runCatching { d.name }.getOrNull()?.takeIf { it.isNotBlank() } ?: "a device" }
         return if (connected.isNotEmpty()) "Connected to " + connected.joinToString(", ") { name(it) }
-        else "On  ·  ${bonded.size} paired, none connected: " + bonded.take(3).joinToString(", ") { name(it) }
+        else "On  ·  ${bonded.size} paired, none connected"
     }
 
     /** BluetoothDevice.isConnected is hidden; on failure assume not connected. */
     private fun isConnected(d: BluetoothDevice): Boolean =
         runCatching { d.javaClass.getMethod("isConnected").invoke(d) as Boolean }.getOrDefault(false)
-
-    fun system(): String = "Android ${Build.VERSION.RELEASE}  ·  ${Build.MANUFACTURER} ${Build.MODEL}"
-    fun firmware(): String = "Firmware ${Build.DISPLAY}"
 }

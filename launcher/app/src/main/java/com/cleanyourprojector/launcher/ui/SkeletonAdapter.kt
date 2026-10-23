@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.cleanyourprojector.launcher.R
+import com.cleanyourprojector.launcher.graphics.Look
 
 /** Placeholder cards for a shelf whose titles are still loading: card-shaped, unfocusable, pulsing. */
 class SkeletonAdapter(private val count: Int = 6) : RecyclerView.Adapter<SkeletonAdapter.VH>() {
@@ -27,6 +28,7 @@ class SkeletonAdapter(private val count: Int = 6) : RecyclerView.Adapter<Skeleto
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
+        holder.card.setBackgroundResource(Look.cardBg)
         holder.pulse?.cancel()
         holder.pulse = ObjectAnimator.ofFloat(holder.card, View.ALPHA, 0.35f, 0.8f).apply {
             duration = 900
@@ -43,7 +45,7 @@ class SkeletonAdapter(private val count: Int = 6) : RecyclerView.Adapter<Skeleto
     }
 
     override fun onViewDetachedFromWindow(holder: VH) { holder.pulse?.pause() }
-    override fun onViewAttachedToWindow(holder: VH) { holder.pulse?.resume() }
+    override fun onViewAttachedToWindow(holder: VH) { holder.card.setBackgroundResource(Look.cardBg); holder.pulse?.resume() }
 
     override fun getItemCount() = count
 }

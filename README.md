@@ -24,8 +24,8 @@ docs/       Design specs and implementation plans.
 | (root)      | `LauncherActivity`, the one screen, and `Prefs`. |
 | `catalog`   | Streaming content: `Tmdb` client, `JustWatch` deep links, `Services` (known streaming apps), `Title`/`HomeRow` models, `Playback` intent building. |
 | `apps`      | Installed apps: `AppInfo` and `AppRepository`. |
-| `ui`        | RecyclerView adapters, focus-aware RecyclerViews and the parking layout managers. |
-| `graphics`  | Drawing helpers: `Cards`, `Layers`, `Sky`, `Wallpaper`, `ImageLoader`. |
+| `ui`        | RecyclerView adapters, focus-aware RecyclerViews, the parking layout managers and `SidePanel` (every menu). |
+| `graphics`  | Drawing helpers: `Cards`, `Layers`, `Themes` (the built-in looks and `Look`), `Wallpaper`, `ImageLoader`. |
 | `settings`  | Settings tab content: `Tile`, `SystemShortcuts`, `DeviceInfo`. |
 | `system`    | Manifest components: boot receiver, keep-alive service, clock dream, `RemoteLink` to the receiver. |
 

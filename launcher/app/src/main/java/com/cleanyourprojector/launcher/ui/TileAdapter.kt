@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.cleanyourprojector.launcher.R
 import com.cleanyourprojector.launcher.graphics.Cards
+import com.cleanyourprojector.launcher.graphics.Look
 import com.cleanyourprojector.launcher.settings.Tile
 
 class TileAdapter(
@@ -31,6 +32,7 @@ class TileAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val t = items[position]
+        holder.card.setBackgroundResource(Look.cardBg)
         holder.icon.setImageResource(t.icon)
         holder.title.text = t.title
         holder.subtitle.text = t.subtitle
@@ -38,6 +40,9 @@ class TileAdapter(
         Cards.bindFocus(holder.card) { onFocus(t) }
         holder.card.setOnClickListener { onClick(t) }
     }
+
+    /** Cached holders come back without a bind; the card style follows the theme on every attach. */
+    override fun onViewAttachedToWindow(holder: VH) { holder.card.setBackgroundResource(Look.cardBg) }
 
     override fun onViewRecycled(holder: VH) { Cards.reset(holder.card) }
     override fun getItemCount() = items.size

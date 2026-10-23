@@ -84,10 +84,10 @@ object Services {
         return ALL.firstOrNull { s -> s.normNames.any { b -> a == b || a.contains(b) || b.contains(a) } }
     }
 
-    /** Installed apps that belong to a service, most recently used first; one app per service. */
+    /** Installed apps that belong to a service, in list order; one app per service. */
     fun installed(apps: List<AppInfo>): Map<Service, AppInfo> {
         val out = LinkedHashMap<Service, AppInfo>()
-        for (app in apps.sortedByDescending { it.lastUsed }) {
+        for (app in apps) {
             val s = forApp(app.packageName, app.label) ?: continue
             if (!out.containsKey(s)) out[s] = app
         }

@@ -13,6 +13,7 @@ import com.cleanyourprojector.launcher.catalog.Tmdb
 import com.cleanyourprojector.launcher.graphics.Cards
 import com.cleanyourprojector.launcher.graphics.ImageLoader
 import com.cleanyourprojector.launcher.graphics.Layers
+import com.cleanyourprojector.launcher.graphics.Look
 
 class TitleAdapter(
     row: HomeRow,
@@ -41,6 +42,7 @@ class TitleAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val t = row.titles[position]
         val row = row
+        holder.card.setBackgroundResource(Look.cardBg)
         holder.name.text = t.name
         holder.card.contentDescription = t.name
         // w300 is the smallest TMDB backdrop that still covers a focused card (297px wide at 1.12x).
@@ -49,6 +51,9 @@ class TitleAdapter(
         holder.card.setOnClickListener { onClick(t, row) }
         holder.card.setOnLongClickListener { onLongClick(t, row); true }
     }
+
+    /** Cached holders come back without a bind; the card style follows the theme on every attach. */
+    override fun onViewAttachedToWindow(holder: VH) { holder.card.setBackgroundResource(Look.cardBg) }
 
     override fun onViewRecycled(holder: VH) { Cards.reset(holder.card) }
 

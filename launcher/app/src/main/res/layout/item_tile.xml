@@ -51,7 +51,7 @@
             android:layout_marginTop="2dp"
             android:textColor="@color/text_primary"
             android:textSize="16sp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/outfit_medium"
             android:maxLines="2"
             android:ellipsize="end" />
     </LinearLayout>

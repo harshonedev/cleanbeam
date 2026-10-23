@@ -42,8 +42,8 @@ object SystemShortcuts {
         SystemShortcut("Brightness", "Projector", "Pick a brightness mode", R.drawable.ic_brightness, listOf(action("jixin.intent.action.BRIGHNESS_MODE"))),
         SystemShortcut("Projection", "Projector", "Front, rear, ceiling or table", R.drawable.ic_projection, listOf(action("jixin.intent.action.PROJECTION_TYPE"))),
         SystemShortcut("Input source", "Projector", "Switch to HDMI or another input", R.drawable.ic_input, listOf(action("jixin.intent.action.INPUT_SOURCE"))),
-        SystemShortcut("Projector settings", "Projector", "", R.drawable.ic_projector, listOf(action("jixin.intent.action.SETTINGS"))),
-        SystemShortcut("System settings", "System", "", R.drawable.ic_settings, listOf(
+        SystemShortcut("Projector settings", "Projector", "Picture, sound and every projector option", R.drawable.ic_projector, listOf(action("jixin.intent.action.SETTINGS"))),
+        SystemShortcut("System settings", "System", "Date and time, language, storage, apps", R.drawable.ic_settings, listOf(
             component("com.android.tv.settings", "com.android.tv.settings.MainSettings"),
             action(Settings.ACTION_SETTINGS)))
     )

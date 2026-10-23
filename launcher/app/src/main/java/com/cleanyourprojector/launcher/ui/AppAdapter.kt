@@ -13,6 +13,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.cleanyourprojector.launcher.R
 import com.cleanyourprojector.launcher.apps.AppInfo
+import com.cleanyourprojector.launcher.graphics.Look
 
 class AppAdapter(
     private var items: List<AppInfo>,
@@ -45,6 +46,7 @@ class AppAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val app = items[position]
         val card = holder.card
+        card.setBackgroundResource(Look.cardBg)
         if (app.banner != null) {
             holder.banner.setImageDrawable(app.banner)
             holder.banner.visibility = View.VISIBLE
@@ -84,6 +86,9 @@ class AppAdapter(
         }
     }
 
+    /** Cached holders come back without a bind; the card style follows the theme on every attach. */
+    override fun onViewAttachedToWindow(holder: VH) { holder.card.setBackgroundResource(Look.cardBg) }
+
     override fun onViewRecycled(holder: VH) {
         holder.card.animate().cancel()
         holder.itemView.animate().cancel()
@@ -105,15 +110,13 @@ class AppAdapter(
     private fun dp(v: View, value: Float): Float =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, v.resources.displayMetrics)
 
-
-    /** Apps without a banner get a diagonal wash of their own color, dark enough for the label. */
+    /**
+     * Apps without a banner get a flat wash of their own colour, dark enough for the label.
+     * One colour, no gradient: a gradient is a shader per card on this GPU.
+     */
     private fun fallbackArt(v: View, color: Int): GradientDrawable {
         val hsv = FloatArray(3); Color.colorToHSV(color, hsv)
-        hsv[2] = (hsv[2] * 0.55f).coerceAtLeast(0.18f); hsv[1] = (hsv[1] * 0.9f)
-        val deep = Color.HSVToColor(hsv)
-        return GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            intArrayOf(deep, 0xFF131727.toInt())
-        ).apply { cornerRadius = dp(v, 14f) }
+        hsv[2] = (hsv[2] * 0.5f).coerceAtLeast(0.16f); hsv[1] = (hsv[1] * 0.85f)
+        return GradientDrawable().apply { setColor(Color.HSVToColor(hsv)); cornerRadius = dp(v, 14f) }
     }
 }

@@ -1,9 +1,9 @@
 <resources>
-    <color name="bg_top">#070A14</color>
-    <color name="bg_bottom">#0E1322</color>
+    <color name="bg">#070A14</color>
     <color name="text_primary">#F4F6FB</color>
     <color name="text_secondary">#A3ACC4</color>
     <color name="text_muted">#6E7791</color>
+    <color name="text_inverse">#0B0F1C</color>
     <color name="card">#151A2C</color>
     <color name="accent">#5B8CFF</color>
 </resources>

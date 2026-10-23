@@ -1,7 +1,5 @@
 package com.cleanyourprojector.launcher.apps
 
-import android.app.AppOpsManager
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -12,7 +10,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.os.Process
 import androidx.palette.graphics.Palette
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -21,13 +18,10 @@ import java.util.concurrent.TimeUnit
 
 object AppRepository {
 
-    private val HIDDEN = setOf("com.cleanyourprojector.launcher", "com.jixin.launcher5")
+    private val HIDDEN = setOf("com.cleanyourprojector.launcher", "io.egate.launcher", "com.jixin.launcher5")
     private const val FALLBACK = 0xFF5B8CFF.toInt()
-    private const val MONTH_MS = 30L * 24 * 60 * 60 * 1000
     /** Banners wider than this are shrunk: a card is ~265px wide, 1.12x when focused. */
     private const val MAX_BANNER_PX = 600
-
-    private class Usage(val lastUsed: Long, val foregroundMs: Long)
 
     /** Icon decode, banner decode and Palette per app, spread over the cores instead of one thread. */
     private val workers = (Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors().coerceIn(2, 4)) as ThreadPoolExecutor)
@@ -35,24 +29,13 @@ object AppRepository {
 
     fun loadApps(context: Context): List<AppInfo> {
         val pm = context.packageManager
-        val usage = usage(context)
-        val jobs = resolveAll(pm).map { ri -> Callable { build(context, pm, ri, usage) } }
+        val jobs = resolveAll(pm).map { ri -> Callable { build(context, pm, ri) } }
         return workers.invokeAll(jobs).map { it.get() }.sortedBy { it.label.lowercase() }
     }
 
     /** Package names the launcher would show right now; cheap, no icons or banners decoded. */
     fun installedPackages(context: Context): Set<String> =
         resolveAll(context.packageManager).mapTo(HashSet()) { it.activityInfo.packageName }
-
-    /** The same apps with fresh last-used / foreground-time figures; no icons or banners re-decoded. */
-    fun withUsage(context: Context, apps: List<AppInfo>): List<AppInfo> {
-        val usage = usage(context)
-        return apps.map { a ->
-            val u = usage[a.packageName]
-            val last = u?.lastUsed ?: 0L; val fg = u?.foregroundMs ?: 0L
-            if (last == a.lastUsed && fg == a.foregroundMs) a else a.copy(lastUsed = last, foregroundMs = fg)
-        }
-    }
 
     /** Leanback launcher activities first, then plain launcher ones; one entry per package. */
     private fun resolveAll(pm: PackageManager): List<ResolveInfo> {
@@ -68,7 +51,7 @@ object AppRepository {
         return found.values.toList()
     }
 
-    private fun build(context: Context, pm: PackageManager, ri: ResolveInfo, usage: Map<String, Usage>): AppInfo {
+    private fun build(context: Context, pm: PackageManager, ri: ResolveInfo): AppInfo {
         val pkg = ri.activityInfo.packageName
         val ai = ri.activityInfo.applicationInfo
         val label = ri.loadLabel(pm)?.toString() ?: pkg
@@ -76,9 +59,7 @@ object AppRepository {
         val banner = runCatching { ri.activityInfo.loadBanner(pm) ?: ai.loadBanner(pm) }.getOrNull()
             ?.let { shrinkBanner(context, it) }
             ?.also { (it as? BitmapDrawable)?.bitmap?.prepareToDraw() }   // upload to the GPU before the card is drawn
-        val pi = runCatching { pm.getPackageInfo(pkg, 0) }.getOrNull()
         val cat = ApplicationInfo.getCategoryTitle(context, ai.category)?.toString()
-        val u = usage[pkg]
         return AppInfo(
             label = label,
             packageName = pkg,
@@ -86,11 +67,7 @@ object AppRepository {
             banner = banner,
             ambient = ambientArt(banner ?: icon),
             color = dominantColor(banner ?: icon),
-            category = cat,
-            version = pi?.versionName,
-            installTime = pi?.firstInstallTime ?: 0L,
-            lastUsed = u?.lastUsed ?: 0L,
-            foregroundMs = u?.foregroundMs ?: 0L
+            category = cat
         )
     }
 
@@ -111,28 +88,6 @@ object AppRepository {
             }
             BitmapDrawable(context.resources, small)
         } catch (e: Exception) { d }
-    }
-
-    fun hasUsageAccess(context: Context): Boolean {
-        val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-        return mode == AppOpsManager.MODE_ALLOWED
-    }
-
-    private fun usage(context: Context): Map<String, Usage> {
-        if (!hasUsageAccess(context)) return emptyMap()
-        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val now = System.currentTimeMillis()
-        val stats = runCatching {
-            usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - MONTH_MS, now)
-        }.getOrNull() ?: return emptyMap()
-        val last = HashMap<String, Long>()
-        val total = HashMap<String, Long>()
-        for (s in stats) {
-            last[s.packageName] = maxOf(last[s.packageName] ?: 0L, s.lastTimeUsed)
-            total[s.packageName] = (total[s.packageName] ?: 0L) + s.totalTimeInForeground
-        }
-        return last.mapValues { (pkg, l) -> Usage(l, total[pkg] ?: 0L) }
     }
 
     private fun dominantColor(d: Drawable): Int {

@@ -2,6 +2,8 @@ package com.cleanyourprojector.launcher
 
 import android.content.Context
 import android.graphics.Color
+import com.cleanyourprojector.launcher.graphics.Theme
+import com.cleanyourprojector.launcher.graphics.Themes
 
 /** Shared settings used by both the launcher and the screensaver. */
 class Prefs(context: Context) {
@@ -33,6 +35,23 @@ class Prefs(context: Context) {
 
     val accentColor: Int get() = ACCENTS[accentIndex].color
 
+    // ----- theme -----
+    /** Stored by name, so inserting a theme in the list never moves a saved choice. */
+    var themeIndex: Int
+        get() {
+            val byName = Themes.indexOf(sp.getString("theme_name", null))
+            if (byName >= 0) return byName
+            return sp.getInt("theme", Themes.DEFAULT).coerceIn(0, Themes.ALL.size - 1)   // pre-name installs
+        }
+        set(v) = sp.edit().putString("theme_name", Themes.ALL[v.coerceIn(0, Themes.ALL.size - 1)].name).apply()
+
+    val theme: Theme get() = Themes.ALL[themeIndex]
+
+    /** Black over the theme's picture, in percent. */
+    var wallpaperDim: Int
+        get() = sp.getInt("wallpaper_dim", 20).coerceIn(0, 80)
+        set(v) = sp.edit().putInt("wallpaper_dim", v.coerceIn(0, 80)).apply()
+
     var columns: Int
         get() = sp.getInt("columns", 5).coerceIn(MIN_COLS, MAX_COLS)
         set(v) = sp.edit().putInt("columns", v.coerceIn(MIN_COLS, MAX_COLS)).apply()
@@ -48,34 +67,6 @@ class Prefs(context: Context) {
     var bigClock: Boolean
         get() = sp.getBoolean("bigclock", true)
         set(v) = sp.edit().putBoolean("bigclock", v).apply()
-
-    var appGlow: Boolean
-        get() = sp.getBoolean("appglow", true)
-        set(v) = sp.edit().putBoolean("appglow", v).apply()
-
-    var ambientSky: Boolean
-        get() = sp.getBoolean("sky", true)
-        set(v) = sp.edit().putBoolean("sky", v).apply()
-
-    var greeting: Boolean
-        get() = sp.getBoolean("greeting", true)
-        set(v) = sp.edit().putBoolean("greeting", v).apply()
-
-    var showStats: Boolean
-        get() = sp.getBoolean("stats", false)
-        set(v) = sp.edit().putBoolean("stats", v).apply()
-
-    var namesFocusedOnly: Boolean
-        get() = sp.getBoolean("names_focus", false)
-        set(v) = sp.edit().putBoolean("names_focus", v).apply()
-
-    var wallpaper: Boolean
-        get() = sp.getBoolean("wallpaper", false)
-        set(v) = sp.edit().putBoolean("wallpaper", v).apply()
-
-    var wallpaperDim: Int
-        get() = sp.getInt("wallpaper_dim", 40).coerceIn(0, 80)
-        set(v) = sp.edit().putInt("wallpaper_dim", v.coerceIn(0, 80)).apply()
 
     // ----- remote shortcuts (keycode -> package) -----
     fun shortcuts(): LinkedHashMap<Int, String> {

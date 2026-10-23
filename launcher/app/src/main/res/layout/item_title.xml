@@ -40,6 +40,6 @@
             android:maxLines="1"
             android:textColor="@color/text_primary"
             android:textSize="13sp"
-            android:fontFamily="sans-serif-medium" />
+            android:fontFamily="@font/outfit_medium" />
     </FrameLayout>
 </FrameLayout>

@@ -2,8 +2,6 @@ package com.cleanyourprojector.launcher
 
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
-import android.app.ActivityManager
-import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -18,16 +16,14 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.os.StatFs
 import android.provider.Settings
 import android.text.InputType
-import android.text.format.DateUtils
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.animation.PathInterpolator
 import android.widget.EditText
@@ -46,10 +42,13 @@ import com.cleanyourprojector.launcher.catalog.Service
 import com.cleanyourprojector.launcher.catalog.Services
 import com.cleanyourprojector.launcher.catalog.Title
 import com.cleanyourprojector.launcher.catalog.Tmdb
+import com.cleanyourprojector.launcher.graphics.Backdrop
 import com.cleanyourprojector.launcher.graphics.Cards
 import com.cleanyourprojector.launcher.graphics.ImageLoader
 import com.cleanyourprojector.launcher.graphics.Layers
 import com.cleanyourprojector.launcher.graphics.Sky
+import com.cleanyourprojector.launcher.graphics.Look
+import com.cleanyourprojector.launcher.graphics.Themes
 import com.cleanyourprojector.launcher.graphics.Wallpaper
 import com.cleanyourprojector.launcher.settings.DeviceInfo
 import com.cleanyourprojector.launcher.settings.SystemShortcuts
@@ -63,6 +62,9 @@ import com.cleanyourprojector.launcher.ui.FocusRowRecyclerView
 import com.cleanyourprojector.launcher.ui.HomeRowsAdapter
 import com.cleanyourprojector.launcher.ui.ParkingGridLayoutManager
 import com.cleanyourprojector.launcher.ui.ShelvesRecyclerView
+import com.cleanyourprojector.launcher.ui.SidePanel
+import com.cleanyourprojector.launcher.ui.SidePanel.Content
+import com.cleanyourprojector.launcher.ui.SidePanel.Row
 import com.cleanyourprojector.launcher.ui.TileAdapter
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -75,9 +77,14 @@ class LauncherActivity : AppCompatActivity() {
 
     private lateinit var prefs: Prefs
     private lateinit var root: View
-    private lateinit var bgA: ImageView
-    private lateinit var bgB: ImageView
+    private lateinit var bg: ImageView
+    private lateinit var dim: View
+    private lateinit var artA: ImageView               // Ambient theme: two layers crossfade when the focused item changes
+    private lateinit var artB: ImageView
     private lateinit var tint: View
+    private lateinit var scrimLeft: View
+    private lateinit var scrimBottom: View
+    private lateinit var panel: SidePanel
     private lateinit var tabHome: TextView
     private lateinit var tabApps: TextView
     private lateinit var tabFavorites: TextView
@@ -93,14 +100,12 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var hero: View
     private lateinit var heroTitle: TextView
     private lateinit var heroSubtitle: TextView
-    private lateinit var heroMeta: TextView
     private lateinit var heroBody: TextView
     private lateinit var row: FocusRowRecyclerView
     private lateinit var shelves: ShelvesRecyclerView
     private lateinit var empty: View
     private lateinit var emptyTitle: TextView
     private lateinit var emptyHint: TextView
-    private lateinit var stats: TextView
     private lateinit var adapter: AppAdapter
     private lateinit var shelvesAdapter: HomeRowsAdapter
 
@@ -111,15 +116,17 @@ class LauncherActivity : AppCompatActivity() {
     private var homeGen = 0                    // bumps per Home load so a superseded fetch can't land
     private var tab = Tab.APPS
     private var heroItem: Any? = null          // AppInfo, Pair<Title, HomeRow> or Tile
-    private var bgFront = false                // which bg layer is visible: false = A, true = B
+    private val backdrop = Backdrop()          // what the background shows: a resource id or a file path
+    private var userSlot = -1L                 // half-hour slot the user picture was chosen for
+    private var artFront = false               // which art layer is visible: false = A, true = B
     private var tintColor = 0
     private var tintAnim: ValueAnimator? = null
     private lateinit var tintDrawable: BitmapDrawable   // white gradient mask, tinted with the room colour
-    private var wallpaperKey = ""
+    private var skyHour = -1
+    private var userPick: String? = null
     private var firstLoad = true
     private var homeFirstShow = true           // cold start lands on the first card even if a tab holds focus
     private var heroGen = 0                    // bumps per hero change so a cancelled fade can't leave it hidden
-    private var usageAccess = false            // AppOps answer, refreshed on resume instead of per hero
     private var clockPattern = ""
     private var clockFormat: SimpleDateFormat? = null
     private var lastClockText: String? = null
@@ -132,7 +139,7 @@ class LauncherActivity : AppCompatActivity() {
     private val heroRunnable = Runnable {
         when (val it = heroItem) {
             is AppInfo -> renderAppHero(it, animate = true)
-            is Pair<*, *> -> renderTitleHero(it.first as Title, it.second as HomeRow)
+            is Pair<*, *> -> renderTitleHero(it.first as Title)
             is Tile -> renderTileHero(it)
         }
     }
@@ -153,14 +160,27 @@ class LauncherActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
         setContentView(R.layout.activity_launcher)
-        // The theme's gradient is only the launch splash: root paints the whole screen itself, so
+        // The theme's colour is only the launch splash: root paints the whole screen itself, so
         // drop the window background instead of filling 1280x720 twice on every frame.
         window.setBackgroundDrawable(null)
 
         root = findViewById(R.id.root)
-        bgA = findViewById(R.id.bg_a)
-        bgB = findViewById(R.id.bg_b)
+        bg = findViewById(R.id.bg)
+        dim = findViewById(R.id.dim)
+        // A flat fill faded with View.alpha would otherwise be composited through a full-screen layer each frame.
+        dim.forceHasOverlappingRendering(false)
+        artA = findViewById(R.id.art_a)
+        artB = findViewById(R.id.art_b)
         tint = findViewById(R.id.tint)
+        scrimLeft = findViewById(R.id.scrim_left_v)
+        scrimBottom = findViewById(R.id.scrim_bottom_v)
+        // Ambient theme layers. Full-screen gradients cost this GPU ~5 ms each per frame as shaders; as bitmaps they are free.
+        val dm = resources.displayMetrics
+        tintDrawable = Layers.tintMask(resources, dm.widthPixels / 4, dm.heightPixels / 4)
+        tint.background = tintDrawable
+        scrimLeft.background = Layers.row(resources, getDrawable(R.drawable.scrim_left)!!, dm.widthPixels)
+        scrimBottom.background = Layers.column(resources, getDrawable(R.drawable.scrim_bottom)!!, dm.heightPixels)
+        panel = findViewById(R.id.panel)
         tabHome = findViewById(R.id.tab_home)
         tabApps = findViewById(R.id.tab_apps)
         tabFavorites = findViewById(R.id.tab_favorites)
@@ -173,23 +193,12 @@ class LauncherActivity : AppCompatActivity() {
         hero = findViewById(R.id.hero)
         heroTitle = findViewById(R.id.hero_title)
         heroSubtitle = findViewById(R.id.hero_subtitle)
-        heroMeta = findViewById(R.id.hero_meta)
         heroBody = findViewById(R.id.hero_body)
         row = findViewById(R.id.row)
         shelves = findViewById(R.id.shelves)
         empty = findViewById(R.id.empty)
         emptyTitle = findViewById(R.id.empty_title)
         emptyHint = findViewById(R.id.empty_hint)
-        stats = findViewById(R.id.stats)
-
-        // Full-screen gradients cost this GPU ~5 ms each per frame as shaders; as bitmaps they are free.
-        val dm = resources.displayMetrics
-        tintDrawable = Layers.tintMask(resources, dm.widthPixels / 4, dm.heightPixels / 4)
-        tint.background = tintDrawable
-        tint.visibility = View.INVISIBLE   // nothing to show until the first card paints the room
-        findViewById<View>(R.id.scrim_left_v).background = Layers.row(resources, getDrawable(R.drawable.scrim_left)!!, dm.widthPixels)
-        findViewById<View>(R.id.scrim_bottom_v).background = Layers.column(resources, getDrawable(R.drawable.scrim_bottom)!!, dm.heightPixels)
-        root.background = skyBackground()
 
         setupTab(tabHome) { selectTab(Tab.HOME) }
         setupTab(tabApps) { selectTab(Tab.APPS) }
@@ -240,20 +249,20 @@ class LauncherActivity : AppCompatActivity() {
         row.upTarget = currentTabView()
         grid.upTarget = currentTabView()
         heroTitle.text = getString(if (tab == Tab.HOME) R.string.home_loading else R.string.loading)
-        heroSubtitle.text = ""; heroMeta.visibility = View.GONE
+        heroSubtitle.text = ""; heroBody.visibility = View.GONE
         underline.post { moveUnderline(currentTabView(), animate = false); paintTabs() }
 
         root.viewTreeObserver.addOnGlobalFocusChangeListener { old, new -> onFocusMoved(old, new) }
         // One synchronous read for the first frame; after that the network callback keeps it current.
         val caps = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
         wifi.visibility = if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) View.VISIBLE else View.GONE
+        applyTheme()
         reloadApps()
         if (prefs.keepAwake) KeepAliveService.start(this)
     }
 
     override fun onResume() {
         super.onResume()
-        usageAccess = AppRepository.hasUsageAccess(this)
         lastWallpaperMinute = -1
         updateClock(); handler.post(tick)
         runCatching { connectivity.registerDefaultNetworkCallback(netCallback, handler) }
@@ -300,6 +309,7 @@ class LauncherActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        panel.close()
         when (tab) {
             Tab.HOME -> { shelves.scrollToPosition(0); focusFirstShelfCard() }
             Tab.APPS, Tab.SETTINGS -> { grid.scrollToPosition(0); grid.post { firstGridCard()?.requestFocus() } }
@@ -311,7 +321,7 @@ class LauncherActivity : AppCompatActivity() {
 
     // ---------- remote shortcuts ----------
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (event != null && event.repeatCount == 0) {
+        if (event != null && event.repeatCount == 0 && !panel.isOpen) {
             val pkg = prefs.shortcuts()[keyCode]
             if (pkg != null) {
                 AppRepository.launchIntentFor(this, pkg)?.let {
@@ -402,7 +412,7 @@ class LauncherActivity : AppCompatActivity() {
         populate(animate = true)
     }
 
-    // ---------- clock / status / background ----------
+    // ---------- clock / status ----------
     private fun updateClock() {
         val now = Date()
         val pattern = buildString {
@@ -416,14 +426,12 @@ class LauncherActivity : AppCompatActivity() {
         // Same text means no relayout and no frame: with seconds hidden the screen stays still for a minute.
         if (text != lastClockText) { lastClockText = text; clock.text = text }
 
-        if (prefs.showStats) {
-            stats.visibility = View.VISIBLE
-            val line = statsLine()
-            if (line != stats.text.toString()) stats.text = line
-        } else stats.visibility = View.GONE
-
         val minute = now.time / 60_000
-        if (minute != lastWallpaperMinute) { lastWallpaperMinute = minute; applyWallpaper() }
+        if (minute != lastWallpaperMinute) {
+            lastWallpaperMinute = minute
+            applyWallpaper()
+            if (prefs.theme.dynamic && Sky.hour() != skyHour) root.background = skyBackground()
+        }
     }
 
     private val connectivity by lazy { getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
@@ -435,33 +443,44 @@ class LauncherActivity : AppCompatActivity() {
         override fun onLost(network: Network) { wifi.visibility = View.GONE }
     }
 
-    /** Wallpaper mode replaces per-item art with a user image; otherwise the focused item paints the room. */
-    private fun applyWallpaper() {
-        val imgs = if (prefs.wallpaper) Wallpaper.images(this) else emptyList()
-        if (imgs.isEmpty()) {
-            if (wallpaperKey.isNotEmpty()) { wallpaperKey = ""; handler.post(heroRunnable) }
-            return
+    // ---------- theme / background ----------
+    /** One still background and one card style; nothing here depends on the focused item. */
+    private fun applyTheme() {
+        val t = prefs.theme
+        Look.glass = t.glass
+        if (t.dynamic) root.background = skyBackground() else root.setBackgroundColor(t.background)
+        scrimLeft.visibility = if (t.dynamic) View.VISIBLE else View.GONE
+        scrimBottom.visibility = if (t.dynamic) View.VISIBLE else View.GONE
+        if (!t.dynamic) {
+            crossfadeArt(null)
+            tintAnim?.cancel(); tintColor = 0
+            tint.visibility = View.INVISIBLE
         }
-        val idx = ((System.currentTimeMillis() / (30 * 60 * 1000)) % imgs.size).toInt()
-        val key = "${imgs[idx].path}:${prefs.wallpaperDim}"
-        if (key == wallpaperKey) return
-        wallpaperKey = key
-        io.execute {
-            val bmp = Wallpaper.load(imgs[idx].path, 1280, 720) ?: return@execute
-            val d = BitmapDrawable(resources, bmp).apply { alpha = 255 - prefs.wallpaperDim * 255 / 100 }
-            handler.post { crossfadeArt(d) }
-        }
+        panel.restyle(prefs.accentColor)
+        restyleCards(root)
+        userSlot = -1
+        lastWallpaperMinute = -1
+        applyWallpaper()
+        // Ambient: paint the room for whatever is focused right now.
+        if (t.dynamic) handler.post(heroRunnable)
     }
 
+    private fun skyBackground(): Drawable {
+        skyHour = Sky.hour()
+        return Layers.column(resources, Sky.drawable(skyHour), resources.displayMetrics.heightPixels)
+    }
+
+    // ---------- Ambient theme: the focused item paints the room ----------
     private fun ambientFor(app: AppInfo): Drawable? {
         val bmp: Bitmap = app.ambient ?: return null
         return BitmapDrawable(resources, bmp).apply { isFilterBitmap = true; alpha = 0x8C }
     }
 
     private fun crossfadeArt(d: Drawable?) {
-        val show = if (bgFront) bgA else bgB
-        val hide = if (bgFront) bgB else bgA
-        bgFront = !bgFront
+        val show = if (artFront) artA else artB
+        val hide = if (artFront) artB else artA
+        if (d == null && show.drawable == null && hide.drawable == null) return
+        artFront = !artFront
         show.setImageDrawable(d)
         show.scaleX = 1.08f; show.scaleY = 1.08f
         show.animate().cancel(); hide.animate().cancel()
@@ -469,9 +488,6 @@ class LauncherActivity : AppCompatActivity() {
         hide.animate().alpha(0f).setDuration(650).setInterpolator(ease)
             .withEndAction { hide.setImageDrawable(null) }.start()
     }
-
-    private fun skyBackground(): Drawable =
-        Layers.column(resources, Sky.drawable(prefs.ambientSky), resources.displayMetrics.heightPixels)
 
     private fun animateTint(color: Int) {
         if (color == tintColor) return
@@ -490,13 +506,52 @@ class LauncherActivity : AppCompatActivity() {
         }
     }
 
-    private fun statsLine(): String {
-        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val mi = ActivityManager.MemoryInfo(); am.getMemoryInfo(mi)
-        val ramFree = mi.availMem / (1024.0 * 1024 * 1024)
-        val fs = StatFs(Environment.getDataDirectory().path)
-        val storFree = fs.availableBytes / (1024.0 * 1024 * 1024)
-        return String.format(Locale.US, "RAM %.1fG free    Storage %.0fG free", ramFree, storFree)
+    /** Live cards take the new card style now; recycled ones take it when they are bound again. */
+    private fun restyleCards(v: View) {
+        if (v.id == R.id.card) v.setBackgroundResource(Look.cardBg)
+        if (v is ViewGroup) for (i in 0 until v.childCount) restyleCards(v.getChildAt(i))
+    }
+
+    /** The theme's picture: a bundled one, or the user's own (a new one every half hour). */
+    private fun applyWallpaper() {
+        val t = prefs.theme
+        val source: Any? = when {
+            t.wallpaper != 0 -> t.wallpaper
+            t.userWallpaper -> userPicture()
+            else -> null
+        }
+        val dm = resources.displayMetrics
+        when (val c = backdrop.change(source?.toString())) {
+            Backdrop.Change.None -> if (source != null) dim.alpha = prefs.wallpaperDim / 100f
+            Backdrop.Change.Clear -> showBackground(null)
+            is Backdrop.Change.Load -> io.execute {
+                val bmp = if (source is Int) Wallpaper.load(resources, source, dm.widthPixels, dm.heightPixels)
+                          else Wallpaper.load(source as String, dm.widthPixels, dm.heightPixels)
+                handler.post { if (backdrop.isCurrent(c.key)) showBackground(bmp) }
+            }
+        }
+    }
+
+    /** The user's picture for this half hour; the folder is listed once per slot, not every minute. */
+    private fun userPicture(): String? {
+        val slot = System.currentTimeMillis() / (30 * 60 * 1000)
+        if (slot != userSlot) {
+            userSlot = slot
+            userPick = Wallpaper.images(this).takeIf { it.isNotEmpty() }?.let { it[(slot % it.size).toInt()].path }
+        }
+        return userPick
+    }
+
+    private fun showBackground(bmp: Bitmap?) {
+        bg.animate().cancel(); dim.animate().cancel()
+        if (bmp == null) {
+            bg.animate().alpha(0f).setDuration(300).withEndAction { bg.setImageDrawable(null) }.start()
+            dim.animate().alpha(0f).setDuration(300).start()
+            return
+        }
+        bg.setImageBitmap(bmp)
+        bg.animate().alpha(1f).setDuration(500).setInterpolator(ease).start()
+        dim.animate().alpha(prefs.wallpaperDim / 100f).setDuration(500).start()
     }
 
     // ---------- apps ----------
@@ -504,9 +559,9 @@ class LauncherActivity : AppCompatActivity() {
         io.execute {
             val t0 = System.currentTimeMillis()
             val apps = runCatching { AppRepository.loadApps(this) }
-                .onFailure { Log.e("EGate", "loadApps failed", it) }
+                .onFailure { Log.e(TAG, "loadApps failed", it) }
                 .getOrDefault(allApps)
-            Log.i("EGate", "loaded ${apps.size} apps in ${System.currentTimeMillis() - t0}ms")
+            Log.i(TAG, "loaded ${apps.size} apps in ${System.currentTimeMillis() - t0}ms")
             handler.post {
                 allApps = apps
                 prefs.seedFavorites(apps.map { it.packageName })
@@ -516,17 +571,12 @@ class LauncherActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Back from another app: only the usage figures can have moved, so refresh those and keep the
-     * decoded icons, banners and colors. A changed set of installed apps still reloads everything.
-     */
+    /** Back from another app: a changed set of installed apps reloads everything; otherwise nothing moved. */
     private fun refreshApps() {
         val current = allApps
         io.execute {
             val installed = runCatching { AppRepository.installedPackages(this) }.getOrNull()
-            if (installed == null || installed != current.mapTo(HashSet()) { it.packageName }) { reloadApps(); return@execute }
-            val apps = runCatching { AppRepository.withUsage(this, current) }.getOrDefault(current)
-            handler.post { allApps = apps; populate(animate = false) }
+            if (installed == null || installed != current.mapTo(HashSet()) { it.packageName }) reloadApps()
         }
     }
 
@@ -545,21 +595,18 @@ class LauncherActivity : AppCompatActivity() {
     private fun tiles(): List<Tile> {
         val out = ArrayList<Tile>()
         out += Tile("Phone remote", "Remote", remote.summary(), R.drawable.ic_phone) {
-            remote.pairingIntent()?.let { safeStart(it) } ?: toast("EGate Remote isn't installed")
+            remote.pairingIntent()?.let { safeStart(it) } ?: toast("The phone remote app isn't installed")
         }
         for ((s, intent) in SystemShortcuts.available(this)) {
             // Live state where the system lets us read it; the shortcut's own blurb otherwise.
             val detail = when (s.label) {
                 "Wi-Fi" -> DeviceInfo.wifi(this)
                 "Bluetooth" -> DeviceInfo.bluetooth(this)
-                "System settings" -> DeviceInfo.system()
-                "Projector settings" -> DeviceInfo.firmware()
                 else -> s.detail
             }
             out += Tile(s.label, s.group, detail, s.icon) { safeStart(intent) }
         }
-        val ver = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?"
-        out += Tile("Launcher", "This launcher", "EGate Home $ver  ·  accent ${Prefs.ACCENTS[prefs.accentIndex].name}  ·  region $region", R.drawable.ic_home) { showLauncherOptions() }
+        out += Tile("Launcher", "This launcher", "Theme ${prefs.theme.name}  ·  Accent ${Prefs.ACCENTS[prefs.accentIndex].name}", R.drawable.ic_home) { showLauncherOptions() }
         return out
     }
 
@@ -590,12 +637,10 @@ class LauncherActivity : AppCompatActivity() {
         swapHero(animate = true) {
             heroTitle.text = t.title
             heroSubtitle.text = t.subtitle
-            heroMeta.text = t.detail
-            heroMeta.visibility = View.VISIBLE
-            heroBody.visibility = View.GONE
+            heroBody.text = t.detail
+            heroBody.visibility = if (t.detail.isBlank()) View.GONE else View.VISIBLE
         }
-        if (wallpaperKey.isEmpty()) crossfadeArt(null)
-        animateTint(prefs.accentColor)
+        if (prefs.theme.dynamic) { crossfadeArt(null); animateTint(prefs.accentColor) }
     }
 
     private fun favoriteApps(): List<AppInfo> {
@@ -637,7 +682,7 @@ class LauncherActivity : AppCompatActivity() {
         empty.visibility = View.VISIBLE
         heroItem = null
         hero.animate().alpha(0f).setDuration(200).withLayer().start()
-        crossfadeArt(null); animateTint(prefs.accentColor)
+        if (prefs.theme.dynamic) { crossfadeArt(null); animateTint(prefs.accentColor) }
     }
 
     private fun populateRow(animate: Boolean) {
@@ -726,11 +771,11 @@ class LauncherActivity : AppCompatActivity() {
         val remaining = java.util.concurrent.atomic.AtomicInteger(pending.size)
         io.execute {
             val providers = runCatching { Tmdb.providers(this, reg) }
-                .onFailure { Log.e("EGate", "tmdb providers failed", it) }.getOrDefault(emptyList())
+                .onFailure { Log.e(TAG, "tmdb providers failed", it) }.getOrDefault(emptyList())
             pending.forEachIndexed { i, p ->
                 rowsIo.execute {
                     val r = runCatching { p.load(providers) }
-                        .onFailure { Log.e("EGate", "tmdb row '${p.row.header}' failed", it) }
+                        .onFailure { Log.e(TAG, "tmdb row '${p.row.header}' failed", it) }
                         .getOrDefault(p.row.copy(loading = false))
                     done[i] = r
                     val last = remaining.decrementAndGet() == 0
@@ -740,7 +785,7 @@ class LauncherActivity : AppCompatActivity() {
                         if (last) {
                             homeLoading = false
                             val rows = done.filterNotNull().filter { it.titles.isNotEmpty() }
-                            Log.i("EGate", "home rows: ${rows.map { "${it.header} (${it.titles.size})" }}")
+                            Log.i(TAG, "home rows: ${rows.map { "${it.header} (${it.titles.size})" }}")
                             if (rows.isNotEmpty()) { homeRows = rows; homeLoadedAt = System.currentTimeMillis() }
                             else if (cold) homeRows = emptyList()
                         }
@@ -783,7 +828,7 @@ class LauncherActivity : AppCompatActivity() {
                 .firstOrNull { it?.isFocusable == true }
             if (card != null) card.requestFocus()
             else if (attempt < 8 && tab == Tab.HOME) handler.postDelayed({ focusFirstShelfCard(attempt + 1) }, 60)
-            else Log.w("EGate", "first shelf card not found after $attempt attempts")
+            else Log.w(TAG, "first shelf card not found after $attempt attempts")
         }
     }
 
@@ -808,65 +853,34 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun renderAppHero(app: AppInfo, animate: Boolean) {
-        val subtitle = listOfNotNull(
-            app.category?.let { "$it app" },
-            shortVersion(app.version)?.let { "version $it" }
-        ).joinToString(", ").replaceFirstChar { it.uppercase() }
-        val meta = when {
-            app.lastUsed > 0 -> {
-                val rel = relative(app.lastUsed, DateUtils.MINUTE_IN_MILLIS)
-                val hrs = app.foregroundMs / 3_600_000
-                if (hrs >= 1) "Last opened $rel, ${hrs}h this month" else "Last opened $rel"
-            }
-            usageAccess -> "Not opened this month"
-            app.installTime > 0 -> "Installed " + relative(app.installTime, DateUtils.DAY_IN_MILLIS)
-            else -> ""
-        }
+        val subtitle = app.category?.let { "$it app" }?.replaceFirstChar { it.uppercase() } ?: ""
         swapHero(animate) {
             heroTitle.text = app.label
             heroSubtitle.text = subtitle
-            heroMeta.text = meta
-            heroMeta.visibility = if (meta.isEmpty()) View.GONE else View.VISIBLE
             heroBody.visibility = View.GONE
         }
-        if (wallpaperKey.isEmpty()) crossfadeArt(ambientFor(app))
-        animateTint(if (prefs.appGlow) app.color else prefs.accentColor)
+        if (prefs.theme.dynamic) { crossfadeArt(ambientFor(app)); animateTint(app.color) }
     }
 
-    private fun renderTitleHero(t: Title, r: HomeRow) {
+    private fun renderTitleHero(t: Title) {
         val subtitle = listOfNotNull(
             if (t.kind == "tv") "Series" else "Film",
             t.year,
-            if (t.rating > 0) String.format(Locale.US, "%.1f on TMDB", t.rating) else null
+            if (t.rating > 0) String.format(Locale.US, "rated %.1f", t.rating) else null
         ).joinToString(", ")
         swapHero(animate = true) {
             heroTitle.text = t.name
             heroSubtitle.text = subtitle
-            heroMeta.visibility = View.GONE
             heroBody.text = t.overview
             heroBody.visibility = if (t.overview.isBlank()) View.GONE else View.VISIBLE
         }
+        if (!prefs.theme.dynamic) return
         val url = Tmdb.imageUrl(t.backdrop, "w780") ?: return
-        if (wallpaperKey.isNotEmpty() && !prefs.appGlow) return
         ImageLoader.fetch(this, url, 800, { bmp -> bmp to AppRepository.colorOf(bmp) }) { res ->
-            if (res == null || (heroItem as? Pair<*, *>)?.first != t) return@fetch
-            if (wallpaperKey.isEmpty()) crossfadeArt(BitmapDrawable(resources, res.first).apply { alpha = 0x99 })
-            animateTint(if (prefs.appGlow) res.second else prefs.accentColor)
+            if (res == null || (heroItem as? Pair<*, *>)?.first != t || !prefs.theme.dynamic) return@fetch
+            crossfadeArt(BitmapDrawable(resources, res.first).apply { alpha = 0x99 })
+            animateTint(res.second)
         }
-    }
-
-    /** "2 hours ago" / "yesterday" read mid-sentence; a date like "May 26" keeps its capital. */
-    private fun relative(time: Long, minRes: Long): String {
-        val s = DateUtils.getRelativeTimeSpanString(time, System.currentTimeMillis(), minRes).toString()
-        return if (s.endsWith("ago") || s.equals("yesterday", true) || s.equals("today", true))
-            s.replaceFirstChar { it.lowercase() } else s
-    }
-
-    /** Build suffixes like "-857911644-release" are noise on a TV. Keep the dotted part. */
-    private fun shortVersion(v: String?): String? {
-        if (v.isNullOrBlank()) return null
-        val core = v.trim().takeWhile { it.isDigit() || it == '.' }
-        return (if (core.length >= 3) core else v.trim()).take(24)
     }
 
     // ---------- launching ----------
@@ -916,10 +930,12 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun chooseWatchOption(t: Title, options: List<WatchOption>) {
-        val labels = options.map { o -> if (o.app != null) "Open in ${o.app.label}" else "Install ${o.service.name}" }
-        AlertDialog.Builder(this).setTitle(t.name)
-            .setItems(labels.toTypedArray()) { _, i -> watch(t, options[i]) }
-            .show()
+        panel.open {
+            Content(t.name, options.map { o ->
+                val label = if (o.app != null) "Open in ${o.app.label}" else "Install ${o.service.name}"
+                Row(label) { panel.close(); watch(t, o) }
+            })
+        }
     }
 
     private fun watch(t: Title, o: WatchOption) {
@@ -933,30 +949,29 @@ class LauncherActivity : AppCompatActivity() {
         io.execute {
             // Per-title link (network, cached); null just means the search link is used instead.
             val link = runCatching { JustWatch.urlFor(this, t, reg, o.service) }
-                .onFailure { Log.w("EGate", "justwatch ${t.name} failed", it) }.getOrNull()
+                .onFailure { Log.w(TAG, "justwatch ${t.name} failed", it) }.getOrNull()
             val intent = Playback.playIntent(this, app.packageName, o.service, t.name, link)
-            Log.i("EGate", "watch '${t.name}' in ${app.packageName}: link=$link -> ${intent?.toUri(0)}")
+            Log.i(TAG, "watch '${t.name}' in ${app.packageName}: link=$link -> ${intent?.toUri(0)}")
             handler.post { if (intent == null) toast("Can't open ${o.service.name}") else safeStart(intent) }
         }
     }
 
     // ---------- long-press menu (apps) ----------
     private fun appMenu(app: AppInfo) {
-        val fav = prefs.isFavorite(app.packageName)
-        val actions = mutableListOf<Pair<String, () -> Unit>>()
-        if (fav) {
-            actions += "Unpin from favorites" to { prefs.toggleFavorite(app.packageName); refreshIfFavorites() }
-            actions += "Move left" to { prefs.moveFavorite(app.packageName, -1); refreshIfFavorites() }
-            actions += "Move right" to { prefs.moveFavorite(app.packageName, +1); refreshIfFavorites() }
-        } else {
-            actions += "Pin to favorites" to { prefs.toggleFavorite(app.packageName); refreshIfFavorites() }
+        panel.open {
+            val fav = prefs.isFavorite(app.packageName)
+            val rows = ArrayList<Row>()
+            if (fav) {
+                rows += Row("Unpin from favorites") { prefs.toggleFavorite(app.packageName); refreshIfFavorites(); panel.refresh() }
+                rows += Row("Move left") { prefs.moveFavorite(app.packageName, -1); refreshIfFavorites() }
+                rows += Row("Move right") { prefs.moveFavorite(app.packageName, +1); refreshIfFavorites() }
+            } else {
+                rows += Row("Pin to favorites") { prefs.toggleFavorite(app.packageName); refreshIfFavorites(); panel.refresh() }
+            }
+            rows += Row("Assign remote button") { captureShortcut(app) }
+            rows += Row("App info") { panel.close(); appInfo(app) }
+            Content(app.label, rows, message = app.category?.let { "$it app" })
         }
-        actions += "Assign remote button" to { captureShortcut(app) }
-        actions += "App info" to { appInfo(app) }
-        AlertDialog.Builder(this)
-            .setTitle(app.label)
-            .setItems(actions.map { it.first }.toTypedArray()) { _, i -> actions[i].second() }
-            .show()
     }
 
     private fun refreshIfFavorites() {
@@ -976,20 +991,21 @@ class LauncherActivity : AppCompatActivity() {
     )
 
     private fun captureShortcut(app: AppInfo) {
-        val dlg = AlertDialog.Builder(this)
-            .setTitle("Assign button to ${app.label}")
-            .setMessage("Press the remote button to use as a shortcut.\n(Direction, OK, Back and Home can't be used.)")
-            .setNegativeButton("Cancel", null)
-            .create()
-        dlg.setOnKeyListener { d, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN && keyCode !in reservedKeys) {
-                prefs.setShortcut(keyCode, app.packageName)
-                d.dismiss()
-                toast("${keyName(keyCode)} -> ${app.label}")
-                true
-            } else false
+        panel.open {
+            Content(
+                "Assign a button to ${app.label}",
+                listOf(Row("Cancel") { panel.back() }),
+                message = "Press the remote button to use as a shortcut.\nDirection, OK, Back and Home can't be used.",
+                onKey = { event ->
+                    if (event.action == KeyEvent.ACTION_DOWN && event.keyCode !in reservedKeys) {
+                        prefs.setShortcut(event.keyCode, app.packageName)
+                        toast("${keyName(event.keyCode)} opens ${app.label}")
+                        panel.back()
+                        true
+                    } else false
+                }
+            )
         }
-        dlg.show()
     }
 
     private fun keyName(code: Int): String {
@@ -997,146 +1013,120 @@ class LauncherActivity : AppCompatActivity() {
         return n.removePrefix("KEYCODE_").replace('_', ' ')
     }
 
-    // ---------- options ----------
+    // ---------- launcher settings ----------
     private fun showLauncherOptions() {
-        val tokenState = if (Tmdb.configured(this)) "Set" else "Not set"
-        val labels = arrayOf(
-            "TMDB access token: $tokenState",
-            "Region: $region",
-            "Refresh Home",
-            "Accent color: ${Prefs.ACCENTS[prefs.accentIndex].name}",
-            "Tint room with art color: ${onOff(prefs.appGlow)}",
-            "Wallpaper: ${onOff(prefs.wallpaper)}",
-            "Ambient sky background: ${onOff(prefs.ambientSky)}",
-            "System stats line: ${onOff(prefs.showStats)}",
-            "24-hour clock: ${onOff(prefs.clock24h)}",
-            "Show seconds: ${onOff(prefs.showSeconds)}",
-            "Remote shortcuts…",
-            "Keep Wi-Fi awake in standby: ${onOff(prefs.keepAwake)}"
-        )
-        AlertDialog.Builder(this)
-            .setTitle("Launcher settings")
-            .setItems(labels) { _, which ->
-                when (which) {
-                    0 -> enterToken()
-                    1 -> pickRegion()
-                    2 -> { Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0; if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME) }
-                    3 -> pickAccent()
-                    4 -> { prefs.appGlow = !prefs.appGlow; retint(); showLauncherOptions() }
-                    5 -> wallpaperMenu()
-                    6 -> { prefs.ambientSky = !prefs.ambientSky; root.background = skyBackground(); showLauncherOptions() }
-                    7 -> { prefs.showStats = !prefs.showStats; updateClock(); showLauncherOptions() }
-                    8 -> { prefs.clock24h = !prefs.clock24h; updateClock(); showLauncherOptions() }
-                    9 -> { prefs.showSeconds = !prefs.showSeconds; updateClock(); showLauncherOptions() }
-                    10 -> shortcutsManager()
-                    11 -> {
-                        prefs.keepAwake = !prefs.keepAwake
-                        if (prefs.keepAwake) KeepAliveService.start(this) else KeepAliveService.stop(this)
-                        showLauncherOptions()
-                    }
-                }
+        panel.open {
+            val rows = ArrayList<Row>()
+            rows += Row("Theme", prefs.theme.name) { pickTheme() }
+            rows += Row("Accent color", Prefs.ACCENTS[prefs.accentIndex].name) { pickAccent() }
+            if (prefs.theme.hasPicture) rows += Row("Picture dim", "${prefs.wallpaperDim}%") { pickDim() }
+            rows += Row("24-hour clock", onOff(prefs.clock24h)) { prefs.clock24h = !prefs.clock24h; updateClock(); panel.refresh() }
+            rows += Row("Show seconds", onOff(prefs.showSeconds)) { prefs.showSeconds = !prefs.showSeconds; updateClock(); panel.refresh() }
+            rows += Row("Remote shortcuts") { shortcutsManager() }
+            rows += Row("Refresh Home") {
+                Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
+                panel.close()
+                if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME)
             }
-            .show()
+            rows += Row("Region", region) { pickRegion() }
+            rows += Row("TMDB access token", if (Tmdb.configured(this)) "Set" else "Not set") { enterToken() }
+            rows += Row("Keep Wi-Fi awake in standby", onOff(prefs.keepAwake)) {
+                prefs.keepAwake = !prefs.keepAwake
+                if (prefs.keepAwake) KeepAliveService.start(this) else KeepAliveService.stop(this)
+                panel.refresh()
+            }
+            Content("Launcher settings", rows)
+        }
+    }
+
+    /** Picking a theme applies it at once, behind the panel, so the list doubles as a preview. */
+    private fun pickTheme() {
+        panel.open {
+            val noPictures = prefs.theme.userWallpaper && Wallpaper.images(this).isEmpty()
+            Content("Theme", Themes.ALL.mapIndexed { i, t ->
+                Row(t.name, checked = i == prefs.themeIndex) {
+                    if (prefs.themeIndex != i) { prefs.themeIndex = i; applyTheme(); refreshTilesIfSettings(); panel.refresh() }
+                }
+            }, message = if (noPictures) "No pictures yet. Copy some to:\n${Wallpaper.dir(this).absolutePath}" else null)
+        }
+    }
+
+    private fun pickAccent() {
+        panel.open {
+            Content("Accent color", Prefs.ACCENTS.mapIndexed { i, a ->
+                Row(a.name, checked = i == prefs.accentIndex) {
+                    prefs.accentIndex = i; panel.restyle(prefs.accentColor); refreshTilesIfSettings(); panel.refresh()
+                }
+            })
+        }
+    }
+
+    private fun pickDim() {
+        val opts = intArrayOf(0, 20, 40, 60, 80)
+        panel.open {
+            Content("Picture dim", opts.map { v ->
+                Row("$v%", checked = v == prefs.wallpaperDim) {
+                    prefs.wallpaperDim = v; dim.animate().alpha(v / 100f).setDuration(200).start(); panel.refresh()
+                }
+            })
+        }
+    }
+
+    private fun pickRegion() {
+        val codes = arrayOf("IN", "US", "GB", "CA", "AU", "DE", "FR", "ES", "IT", "BR", "MX", "JP", "KR", "SG", "AE")
+        panel.open {
+            Content("Region for streaming availability", codes.map { c ->
+                Row(c, checked = c == region) {
+                    if (c != region) {
+                        prefs.region = c
+                        Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
+                        if (tab == Tab.HOME) populateHome()
+                    }
+                    panel.back()
+                }
+            })
+        }
     }
 
     private fun enterToken() {
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            hint = "v4 read access token or v3 API key"
+            hint = "Paste the token here"
             setText(prefs.tmdbToken)
             setSingleLine()
         }
-        AlertDialog.Builder(this).setTitle("TMDB access token")
-            .setMessage("Free at themoviedb.org → Settings → API. Or push it to files/tmdb.key with adb.")
-            .setView(input)
-            .setPositiveButton("Save") { _, _ ->
-                prefs.tmdbToken = input.text.toString()
-                Tmdb.invalidateToken()
-                Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
-                if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun pickRegion() {
-        val codes = arrayOf("IN", "US", "GB", "CA", "AU", "DE", "FR", "ES", "IT", "BR", "MX", "JP", "KR", "SG", "AE")
-        val cur = codes.indexOf(region).coerceAtLeast(0)
-        AlertDialog.Builder(this).setTitle("Region for streaming availability")
-            .setSingleChoiceItems(codes, cur) { d, i ->
-                prefs.region = codes[i]
-                Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
-                d.dismiss()
-                if (tab == Tab.HOME) populateHome() else showLauncherOptions()
-            }.show()
-    }
-
-    private fun retint() { tintColor = 0; handler.post(heroRunnable) }
-
-    private fun pickAccent() {
-        val names = Prefs.ACCENTS.map { it.name }.toTypedArray()
-        AlertDialog.Builder(this).setTitle("Accent color")
-            .setSingleChoiceItems(names, prefs.accentIndex) { d, i ->
-                prefs.accentIndex = i; retint(); d.dismiss(); showLauncherOptions()
-            }.show()
-    }
-
-    private fun wallpaperMenu() {
-        val imgs = Wallpaper.images(this)
-        val dir = Wallpaper.dir(this).absolutePath
-        val labels = arrayOf(
-            "Wallpaper: ${onOff(prefs.wallpaper)}",
-            "Dim: ${prefs.wallpaperDim}%",
-            "Images found: ${imgs.size}"
-        )
-        AlertDialog.Builder(this)
-            .setTitle("Wallpaper")
-            .setItems(labels) { _, i ->
-                when (i) {
-                    0 -> {
-                        prefs.wallpaper = !prefs.wallpaper
-                        if (prefs.wallpaper && imgs.isEmpty()) toast("Add images to: $dir")
-                        wallpaperKey = ""; applyWallpaper(); wallpaperMenu()
-                    }
-                    1 -> pickDim()
-                    2 -> toast("adb push pic.jpg $dir/")
-                }
-            }
-            .show()
-    }
-
-    private fun pickDim() {
-        val opts = intArrayOf(0, 20, 40, 60, 80)
-        val labels = opts.map { "$it%" }.toTypedArray()
-        val cur = opts.indexOf(prefs.wallpaperDim).coerceAtLeast(0)
-        AlertDialog.Builder(this).setTitle("Wallpaper dim")
-            .setSingleChoiceItems(labels, cur) { d, i ->
-                prefs.wallpaperDim = opts[i]; wallpaperKey = ""; applyWallpaper(); d.dismiss(); wallpaperMenu()
-            }.show()
+        panel.open {
+            Content("TMDB access token", listOf(
+                Row("Save") {
+                    prefs.tmdbToken = input.text.toString()
+                    Tmdb.invalidateToken()
+                    Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
+                    panel.close()
+                    if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME)
+                },
+                Row("Cancel") { panel.back() }
+            ), message = "Free at themoviedb.org under Settings, API. It lets Home show what to watch.", input = input)
+        }
     }
 
     private fun shortcutsManager() {
-        val map = prefs.shortcuts()
-        val byPkg = allApps.associateBy { it.packageName }
-        if (map.isEmpty()) {
-            AlertDialog.Builder(this)
-                .setTitle("Remote shortcuts")
-                .setMessage("None yet. Hold OK on an app and choose \"Assign remote button\" to add one.")
-                .setPositiveButton("OK", null).show()
-            return
-        }
-        val entries = map.entries.toList()
-        val labels = entries.map { "${keyName(it.key)}  ->  ${byPkg[it.value]?.label ?: it.value}" }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Remote shortcuts (select to remove)")
-            .setItems(labels) { _, i ->
-                val e = entries[i]
-                prefs.removeShortcut(e.key)
-                toast("Removed ${keyName(e.key)}")
+        panel.open {
+            val map = prefs.shortcuts()
+            val byPkg = allApps.associateBy { it.packageName }
+            if (map.isEmpty()) {
+                Content("Remote shortcuts", listOf(Row("OK") { panel.back() }),
+                    message = "None yet. Hold OK on an app and choose \"Assign remote button\" to add one.")
+            } else {
+                Content("Remote shortcuts", map.entries.map { e ->
+                    Row(keyName(e.key), byPkg[e.value]?.label ?: e.value) {
+                        prefs.removeShortcut(e.key); toast("Removed ${keyName(e.key)}"); panel.refresh()
+                    }
+                }, message = "Select a button to remove its shortcut.")
             }
-            .setPositiveButton("Close", null)
-            .show()
+        }
     }
+
+    private fun refreshTilesIfSettings() { if (tab == Tab.SETTINGS) refreshTiles() }
 
     private fun onOff(b: Boolean) = if (b) "On" else "Off"
 
@@ -1144,4 +1134,6 @@ class LauncherActivity : AppCompatActivity() {
     private fun safeStart(intent: Intent) {
         runCatching { startActivity(intent) }.onFailure { toast("Not available") }
     }
+
+    private companion object { const val TAG = "Launcher" }
 }
