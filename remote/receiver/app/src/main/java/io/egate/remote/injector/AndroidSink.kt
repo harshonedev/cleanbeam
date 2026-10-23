@@ -99,16 +99,28 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
      */
     private val clipboard: Clipboard? by lazy { Clipboard.open().also { System.err.println(if (it != null) "clipboard: ok" else "clipboard: unavailable") } }
 
+    private val clipClearer = java.util.Timer("egate-clip-clear", true)
+    private var clipClearTask: java.util.TimerTask? = null
+
     override fun paste(text: String): Boolean {
         val c = clipboard ?: return false
+        clipClearTask?.cancel()
         if (!c.set(text)) return false
         val t = now()
-        return key(KeyEvent.KEYCODE_PASTE, true, t, t, 0) and key(KeyEvent.KEYCODE_PASTE, false, t, t, 0)
+        val ok = key(KeyEvent.KEYCODE_PASTE, true, t, t, 0) and key(KeyEvent.KEYCODE_PASTE, false, t, t, 0)
+        // What was typed may be a password: do not leave it on the projector's clipboard for
+        // other apps. The paste key is delivered synchronously but the app handles it on its own
+        // thread, so give it a moment before clearing.
+        clipClearTask = object : java.util.TimerTask() { override fun run() { c.clear() } }
+            .also { clipClearer.schedule(it, CLIP_CLEAR_DELAY_MS) }
+        return ok
     }
 
-    private class Clipboard private constructor(private val service: Any, private val setMethod: Method) {
+    private class Clipboard private constructor(private val service: Any, private val setMethod: Method, private val clearMethod: Method?) {
         fun set(text: String): Boolean = try {
             val clip = ClipData.newPlainText("egate-remote", text)
+            // Keyboard apps and clipboard managers skip clips flagged sensitive (Android 13+).
+            clip.description.extras = android.os.PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE", true) }
             val args: Array<Any?> = when (setMethod.parameterTypes.size) {
                 2 -> arrayOf(clip, SHELL_PKG)                      // < 29
                 3 -> arrayOf(clip, SHELL_PKG, 0)                   // 29-30: (clip, pkg, userId)
@@ -120,6 +132,22 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
             System.err.println("clipboard set failed: ${t.cause ?: t}"); false
         }
 
+        /** clearPrimaryClip(pkg[, attributionTag], userId[, deviceId]); best effort. */
+        fun clear() {
+            val m = clearMethod ?: return
+            try {
+                val args: Array<Any?> = when (m.parameterTypes.size) {
+                    1 -> arrayOf(SHELL_PKG)
+                    2 -> arrayOf(SHELL_PKG, 0)
+                    3 -> arrayOf(SHELL_PKG, null, 0)
+                    else -> arrayOf(SHELL_PKG, null, 0, 0)
+                }
+                m.invoke(service, *args)
+            } catch (t: Throwable) {
+                System.err.println("clipboard clear failed: ${t.cause ?: t}")
+            }
+        }
+
         companion object {
             private const val SHELL_PKG = "com.android.shell"
             fun open(): Clipboard? = try {
@@ -129,7 +157,8 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
                 val service = stub.getMethod("asInterface", IBinder::class.java).invoke(null, binder)!!
                 val m = service.javaClass.methods.filter { it.name == "setPrimaryClip" }.minByOrNull { it.parameterTypes.size }
                     ?: throw NoSuchMethodException("setPrimaryClip")
-                Clipboard(service, m)
+                val clear = service.javaClass.methods.filter { it.name == "clearPrimaryClip" }.minByOrNull { it.parameterTypes.size }
+                Clipboard(service, m, clear)
             } catch (t: Throwable) {
                 System.err.println("clipboard unavailable: $t"); null
             }
@@ -155,5 +184,6 @@ class AndroidSink : InputInjector.Sink, InputInjector.CharMapper {
     companion object {
         private const val INJECT_MODE_ASYNC = 0
         private const val INJECT_MODE_WAIT_FOR_RESULT = 1
+        private const val CLIP_CLEAR_DELAY_MS = 1_500L
     }
 }
