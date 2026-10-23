@@ -52,7 +52,7 @@
         </activity>
 
         <service
-            android:name=".ClockDreamService"
+            android:name=".system.ClockDreamService"
             android:exported="true"
             android:label="@string/screensaver_name"
             android:permission="android.permission.BIND_DREAM_SERVICE">
@@ -64,7 +64,7 @@
         </service>
 
         <service
-            android:name=".KeepAliveService"
+            android:name=".system.KeepAliveService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
@@ -73,7 +73,7 @@
         </service>
 
         <receiver
-            android:name=".BootReceiver"
+            android:name=".system.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
