@@ -9,7 +9,6 @@ import com.cleanyourprojector.launcher.apps.AppInfo
 import com.cleanyourprojector.launcher.settings.Tile
 import com.cleanyourprojector.launcher.ui.ShelvesRecyclerView
 import com.cleanyourprojector.launcher.ui.SidePanel
-import java.util.Date
 
 /** What the activity lends the Home tab. The activity implements it; the edition's [HomeTab] uses it. */
 interface HomeHost {
@@ -34,9 +33,6 @@ interface HomeHost {
     fun setHero(title: String, subtitle: String, body: String?)
     /** Ambient theme only: wash the room with [art] in [color]. A no-op in any other theme or edition. */
     fun paintRoom(art: Bitmap?, color: Int)
-    fun setHeroVisible(visible: Boolean)
-    /** The small clock in the top-right corner. */
-    fun setStatusClockVisible(visible: Boolean)
     fun showEmpty(title: Int, hint: Int)
     fun hideEmpty()
     /** Select the Home tab, or redraw it if it is already selected. */
@@ -54,6 +50,8 @@ abstract class HomeTab(protected val host: HomeHost) {
     abstract val startsOnHome: Boolean
     /** Hero text while the first app load runs and Home is the start tab. */
     abstract val loadingText: Int
+    /** Whether the launcher shows a Favorites tab beside Home; Lite keeps the favorites on Home only. */
+    open val favoritesTab: Boolean = true
     /** After the activity's views exist. */
     open fun onCreate() {}
     /** Home is the selected tab: draw it. Also called after each app reload while Home shows. */
@@ -68,7 +66,5 @@ abstract class HomeTab(protected val host: HomeHost) {
     open fun renderHero(item: Any): Boolean = false
     /** Extra rows for the Launcher settings panel. */
     open fun settingsRows(): List<SidePanel.Row> = emptyList()
-    /** Once a second, from the activity's clock. */
-    open fun onTick(now: Date) {}
     open fun onDestroy() {}
 }

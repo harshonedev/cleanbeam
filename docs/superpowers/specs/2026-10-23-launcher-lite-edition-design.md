@@ -15,9 +15,10 @@ controls. The Lite edition is that: no catalogue, no network access at all, no A
 1. One Gradle product flavor per edition, `full` and `lite`, in dimension `edition`. Same
    `applicationId`, so either APK replaces the other in place and the phone remote keeps working.
 2. Lite declares no `INTERNET` permission. Nothing in the Lite APK fetches anything.
-3. Lite Home tab: a large clock (time, AM/PM, date) in the hero slot, a **Favorites** shelf of
-   app cards, and a **Quick settings** shelf of tiles. Apps tab = every app. Settings tab = every
-   setting, as in full.
+3. Lite Home tab: a **Favorites** shelf of app cards and a **Quick settings** shelf of tiles,
+   with the focused card in the hero exactly as on the other tabs. Apps tab = every app. Settings
+   tab = every setting, as in full. No Favorites tab: the favorites are the Home shelf (user
+   request, same day).
 4. Lite themes: Midnight, Aurora, Nebula, Ruska, Graphite, Pure black, My wallpaper. No Ambient.
    A saved `theme_name` of Ambient falls back to the default (already how `Prefs` behaves).
 5. Full keeps today's behaviour exactly; the refactor only moves code.
@@ -44,12 +45,11 @@ controls. The Lite edition is that: no catalogue, no network access at all, no A
   the Home strings (`home_loading`, `home_no_token*`, `home_empty*`), the catalog unit tests
   (`src/testFull`).
 - **What Lite adds:** `home/LiteHome`, `ui/LiteHomeAdapter` (rows of app cards or tiles),
-  `layout/home_clock.xml` is in `main` behind a `ViewStub` (never inflated by Full),
   `src/lite/AndroidManifest.xml` removing `INTERNET`, `src/lite/res/values/strings.xml` with the
   label.
-- **Lite Home layout:** the hero and the top-right small clock are hidden while Home shows; the
-  clock block sits where the hero was (time 96sp Outfit light, AM/PM 28sp, date 20sp
-  "EEEE, d MMMM"). Follows `clock24h` / `showSeconds`. Shelves start at the same guideline as Full.
+- **Lite Home layout:** same chrome as Full (hero, tabs, status clock); shelves start at the same
+  guideline. A large clock in the hero slot was built first and removed the same day at the
+  user's request ("same as full").
 - **Quick settings shelf:** the Settings tiles titled Wi-Fi, Bluetooth, Focus, Keystone,
   Brightness, Input source, Launcher, in that order, whichever this box resolves. Favorites shelf
   is dropped when there are no favorites (the Apps tab long-press still pins).
@@ -62,5 +62,4 @@ controls. The Lite edition is that: no catalogue, no network access at all, no A
   starts on Home.
 
 ## Left to the builder
-- Exact clock sizes if 96sp crowds the shelves at 1280×720.
 - Whether the Quick settings shelf should cap at six tiles; it is at most seven today.

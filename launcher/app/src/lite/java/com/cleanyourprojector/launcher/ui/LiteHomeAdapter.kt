@@ -11,14 +11,13 @@ import com.cleanyourprojector.launcher.apps.AppInfo
 import com.cleanyourprojector.launcher.home.LiteRow
 import com.cleanyourprojector.launcher.settings.Tile
 
-/**
- * Lite's Home shelves: a header plus a horizontal row of app cards or settings tiles. Focus on a
- * card reports nothing, because the hero slot shows the clock while Home is up.
- */
+/** Lite's Home shelves: a header plus a horizontal row of app cards or settings tiles. */
 class LiteHomeAdapter(
     private val onAppClick: (AppInfo) -> Unit,
     private val onAppLongClick: (AppInfo) -> Unit,
-    private val onTileClick: (Tile) -> Unit
+    private val onAppFocus: (AppInfo) -> Unit,
+    private val onTileClick: (Tile) -> Unit,
+    private val onTileFocus: (Tile) -> Unit
 ) : RecyclerView.Adapter<LiteHomeAdapter.VH>() {
 
     private var rows: List<LiteRow> = emptyList()
@@ -52,9 +51,9 @@ class LiteHomeAdapter(
         val current = holder.row.adapter
         if (getItemViewType(position) == TYPE_APPS) {
             if (current is AppAdapter) current.submit(r.apps)
-            else holder.row.adapter = AppAdapter(r.apps, onAppClick, onAppLongClick, onFocus = {})
+            else holder.row.adapter = AppAdapter(r.apps, onAppClick, onAppLongClick, onAppFocus)
         } else {
-            val tiles = current as? TileAdapter ?: TileAdapter(onClick = onTileClick, onFocus = {}).also { holder.row.adapter = it }
+            val tiles = current as? TileAdapter ?: TileAdapter(onClick = onTileClick, onFocus = onTileFocus).also { holder.row.adapter = it }
             tiles.submit(r.tiles)
         }
         if (fresh) holder.row.scrollToPosition(0)

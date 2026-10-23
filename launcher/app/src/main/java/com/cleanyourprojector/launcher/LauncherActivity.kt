@@ -225,6 +225,8 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
 
         home = Edition.home(this)
         home.onCreate()
+        // A hidden tab can't take focus, so it can't be selected either.
+        if (!home.favoritesTab) tabFavorites.visibility = View.GONE
         tab = if (home.startsOnHome) Tab.HOME else Tab.APPS
         row.upTarget = currentTabView()
         grid.upTarget = currentTabView()
@@ -406,7 +408,6 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
         val text = fmt.format(now)
         // Same text means no relayout and no frame: with seconds hidden the screen stays still for a minute.
         if (text != lastClockText) { lastClockText = text; clock.text = text }
-        home.onTick(now)
 
         val minute = now.time / 60_000
         if (minute != lastWallpaperMinute) {
@@ -907,8 +908,6 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
         crossfadeArt(art?.let { BitmapDrawable(resources, it).apply { alpha = 0x99 } })
         animateTint(color)
     }
-    override fun setHeroVisible(visible: Boolean) { hero.visibility = if (visible) View.VISIBLE else View.GONE }
-    override fun setStatusClockVisible(visible: Boolean) { clock.visibility = if (visible) View.VISIBLE else View.GONE }
     override fun hideEmpty() { empty.visibility = View.GONE }
     override fun showHome() { if (tab == Tab.HOME) populate(animate = false) else selectTab(Tab.HOME) }
 

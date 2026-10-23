@@ -47,7 +47,7 @@ The Full edition's Home tab needs a TMDB token: either paste it in Settings, or 
 ### Lite edition
 
 `lite` is the same launcher without the streaming catalogue: no TMDB, no deep links, no image
-downloads, and no `INTERNET` permission at all. Its Home tab is a large clock, a Favorites shelf
-and a Quick settings shelf (Wi-Fi, Bluetooth, Focus, Keystone, Brightness, Input source,
-Launcher); the Apps and Settings tabs are the same as Full. The Ambient theme is Full-only.
+downloads, and no `INTERNET` permission at all. Its Home tab is a Favorites shelf and a Quick
+settings shelf (Wi-Fi, Bluetooth, Focus, Keystone, Brightness, Input source,
+Launcher); there is no Favorites tab, and the Apps and Settings tabs are the same as Full. The Ambient theme is Full-only.
 Both editions share one package name, so installing one over the other keeps every setting.
