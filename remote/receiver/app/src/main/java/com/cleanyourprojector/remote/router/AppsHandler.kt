@@ -62,7 +62,7 @@ class AppsHandler(
             intent.action != null -> "-a ${intent.action}"
             else -> return false
         }
-        val flags = intent.flags and (Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        val flags = intent.flags and (Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         return start("$args -f 0x${Integer.toHexString(flags)}")
     }
 

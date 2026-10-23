@@ -102,7 +102,7 @@ Examples:
 
 ## Why launches and shortcuts go through the helper
 
-Android refuses `startActivity` from the receiver's foreground service unless the receiver itself has a visible window ("Abort background activity starts"), so `launch` and `open` run `am start` in the injector helper, which is spawned by adbd as shell/root and exempt. Keys are injected with `INJECT_INPUT_EVENT_MODE_WAIT_FOR_RESULT`: with the async mode this firmware accepts D-pad keys but ignores HOME.
+Android refuses `startActivity` from the receiver's foreground service unless the receiver itself has a visible window ("Abort background activity starts"), so `launch` and `open` run `am start` in the injector helper, which is spawned by adbd as shell/root and exempt. `open` starts the resolved activity explicitly (`-n`) with `NEW_TASK|CLEAR_TASK`: the Atom 3X's Brightness screen has no `CATEGORY_DEFAULT` so an implicit `-a` start cannot resolve it, and the vendor settings screens share one task, where a plain `NEW_TASK` start piles screens up and never starts the one that is the task's root. Keys are injected with `INJECT_INPUT_EVENT_MODE_WAIT_FOR_RESULT`: with the async mode this firmware accepts D-pad keys but ignores HOME.
 
 ## Pairing QR payload
 
