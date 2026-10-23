@@ -97,6 +97,9 @@ class LiteHome(host: HomeHost) : HomeTab(host) {
         val shelves = host.shelves
         shelves.post {
             val card = firstCard(shelves.getChildAt(0)?.findViewById(R.id.row_titles))
+            // A park started for the shelf losing focus (the system re-focuses it around the HOME
+            // intent) would keep scrolling after the jump to the top; it must not outlive this.
+            shelves.stopScroll()
             if (card != null) card.requestFocus()
             else if (attempt < 8 && host.isHomeShowing) handler.postDelayed({ focusFirstCard(attempt + 1) }, 60)
             else Log.w(TAG, "first Home card not found after $attempt attempts")

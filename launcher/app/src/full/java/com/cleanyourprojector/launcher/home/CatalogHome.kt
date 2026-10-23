@@ -174,6 +174,9 @@ class CatalogHome(host: HomeHost) : HomeTab(host) {
             val card = (0 until shelves.childCount).asSequence()
                 .map { firstCard(shelves.getChildAt(it)?.findViewById(R.id.row_titles)) }
                 .firstOrNull { it?.isFocusable == true }
+            // A park started for the shelf losing focus (the system re-focuses it around the HOME
+            // intent) would keep scrolling after the jump to the top; it must not outlive this.
+            shelves.stopScroll()
             if (card != null) card.requestFocus()
             else if (attempt < 8 && host.isHomeShowing) handler.postDelayed({ focusFirstShelfCard(attempt + 1) }, 60)
             else Log.w(TAG, "first shelf card not found after $attempt attempts")

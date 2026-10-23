@@ -110,7 +110,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
     private var artFront = false               // which art layer is visible: false = A, true = B
     private var tintColor = 0
     private var tintAnim: ValueAnimator? = null
-    private lateinit var tintDrawable: BitmapDrawable   // white gradient mask, tinted with the room colour
+    private var tintDrawable: BitmapDrawable? = null    // white gradient mask, tinted with the room colour; Full only
     private var skyHour = -1
     private var userPick: String? = null
     private var firstLoad = true
@@ -161,11 +161,13 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
         scrimLeft = findViewById(R.id.scrim_left_v)
         scrimBottom = findViewById(R.id.scrim_bottom_v)
         // Ambient theme layers. Full-screen gradients cost this GPU ~5 ms each per frame as shaders; as bitmaps they are free.
-        val dm = resources.displayMetrics
-        tintDrawable = Layers.tintMask(resources, dm.widthPixels / 4, dm.heightPixels / 4)
-        tint.background = tintDrawable
-        scrimLeft.background = Layers.row(resources, getDrawable(R.drawable.scrim_left)!!, dm.widthPixels)
-        scrimBottom.background = Layers.column(resources, getDrawable(R.drawable.scrim_bottom)!!, dm.heightPixels)
+        if (Edition.AMBIENT) {
+            val dm = resources.displayMetrics
+            tintDrawable = Layers.tintMask(resources, dm.widthPixels / 4, dm.heightPixels / 4)
+            tint.background = tintDrawable
+            scrimLeft.background = Layers.row(resources, getDrawable(R.drawable.scrim_left)!!, dm.widthPixels)
+            scrimBottom.background = Layers.column(resources, getDrawable(R.drawable.scrim_bottom)!!, dm.heightPixels)
+        }
         panel = findViewById(R.id.panel)
         tabHome = findViewById(R.id.tab_home)
         tabApps = findViewById(R.id.tab_apps)
@@ -408,7 +410,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
         if (minute != lastWallpaperMinute) {
             lastWallpaperMinute = minute
             applyWallpaper()
-            if (prefs.theme.dynamic && Sky.hour() != skyHour) root.background = skyBackground()
+            if (ambient && Sky.hour() != skyHour) root.background = skyBackground()
         }
     }
 
@@ -422,14 +424,17 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
     }
 
     // ---------- theme / background ----------
+    /** The Ambient theme is selected and this edition has it; the Lite edition folds this to false. */
+    private val ambient: Boolean get() = Edition.AMBIENT && prefs.theme.dynamic
+
     /** One still background and one card style; nothing here depends on the focused item. */
     private fun applyTheme() {
         val t = prefs.theme
         Look.glass = t.glass
-        if (t.dynamic) root.background = skyBackground() else root.setBackgroundColor(t.background)
-        scrimLeft.visibility = if (t.dynamic) View.VISIBLE else View.GONE
-        scrimBottom.visibility = if (t.dynamic) View.VISIBLE else View.GONE
-        if (!t.dynamic) {
+        if (ambient) root.background = skyBackground() else root.setBackgroundColor(t.background)
+        scrimLeft.visibility = if (ambient) View.VISIBLE else View.GONE
+        scrimBottom.visibility = if (ambient) View.VISIBLE else View.GONE
+        if (!ambient) {
             crossfadeArt(null)
             tintAnim?.cancel(); tintColor = 0
             tint.visibility = View.INVISIBLE
@@ -440,7 +445,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
         lastWallpaperMinute = -1
         applyWallpaper()
         // Ambient: paint the room for whatever is focused right now.
-        if (t.dynamic) handler.post(heroRunnable)
+        if (ambient) handler.post(heroRunnable)
     }
 
     private fun skyBackground(): Drawable {
@@ -468,6 +473,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
     }
 
     private fun animateTint(color: Int) {
+        val mask = tintDrawable ?: return
         if (color == tintColor) return
         val from = if (tintColor == 0) Color.TRANSPARENT else tintColor
         tintColor = color
@@ -478,7 +484,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
             addUpdateListener { a ->
                 val c = a.animatedValue as Int
                 // The mask carries the alpha ramp; only the colour changes.
-                tintDrawable.setTint(Color.rgb(Color.red(c), Color.green(c), Color.blue(c)))
+                mask.setTint(Color.rgb(Color.red(c), Color.green(c), Color.blue(c)))
             }
             start()
         }
@@ -625,7 +631,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
             heroBody.text = t.detail
             heroBody.visibility = if (t.detail.isBlank()) View.GONE else View.VISIBLE
         }
-        if (prefs.theme.dynamic) { crossfadeArt(null); animateTint(prefs.accentColor) }
+        if (ambient) { crossfadeArt(null); animateTint(prefs.accentColor) }
     }
 
     override fun favoriteApps(): List<AppInfo> {
@@ -667,7 +673,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
         empty.visibility = View.VISIBLE
         heroItem = null
         hero.animate().alpha(0f).setDuration(200).withLayer().start()
-        if (prefs.theme.dynamic) { crossfadeArt(null); animateTint(prefs.accentColor) }
+        if (ambient) { crossfadeArt(null); animateTint(prefs.accentColor) }
     }
 
     private fun populateRow(animate: Boolean) {
@@ -736,7 +742,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
             heroSubtitle.text = subtitle
             heroBody.visibility = View.GONE
         }
-        if (prefs.theme.dynamic) { crossfadeArt(ambientFor(app)); animateTint(app.color) }
+        if (ambient) { crossfadeArt(ambientFor(app)); animateTint(app.color) }
     }
 
     // ---------- launching ----------
@@ -895,7 +901,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
         }
     }
     override fun paintRoom(art: Bitmap?, color: Int) {
-        if (!(Edition.AMBIENT && prefs.theme.dynamic)) return
+        if (!ambient) return
         crossfadeArt(art?.let { BitmapDrawable(resources, it).apply { alpha = 0x99 } })
         animateTint(color)
     }

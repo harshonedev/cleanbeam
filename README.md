@@ -36,10 +36,18 @@ Unit tests mirror the package under `launcher/app/src/test/`.
 
 ```sh
 cd launcher
-./gradlew :app:assembleDebug :app:testDebugUnitTest
+./gradlew :app:assembleFullDebug :app:assembleLiteDebug :app:testFullDebugUnitTest :app:testLiteDebugUnitTest
 adb connect <projector-ip>:3333
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/full/debug/app-full-debug.apk    # or lite/debug/app-lite-debug.apk
 ```
 
-The Home tab needs a TMDB token: either paste it in Settings, or push it to
+The Full edition's Home tab needs a TMDB token: either paste it in Settings, or push it to
 `/sdcard/Android/data/com.cleanyourprojector.launcher/files/tmdb.key`.
+
+### Lite edition
+
+`lite` is the same launcher without the streaming catalogue: no TMDB, no deep links, no image
+downloads, and no `INTERNET` permission at all. Its Home tab is a large clock, a Favorites shelf
+and a Quick settings shelf (Wi-Fi, Bluetooth, Focus, Keystone, Brightness, Input source,
+Launcher); the Apps and Settings tabs are the same as Full. The Ambient theme is Full-only.
+Both editions share one package name, so installing one over the other keeps every setting.
