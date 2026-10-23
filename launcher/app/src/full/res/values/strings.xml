@@ -1,0 +1,7 @@
+<resources>
+    <string name="home_loading">Finding what to watch…</string>
+    <string name="home_no_token">Home needs a TMDB access token</string>
+    <string name="home_no_token_hint">Settings → TMDB access token, or push it to files/tmdb.key.</string>
+    <string name="home_empty">Nothing to show yet</string>
+    <string name="home_empty_hint">Check the network, then open Settings → Refresh Home.</string>
+</resources>

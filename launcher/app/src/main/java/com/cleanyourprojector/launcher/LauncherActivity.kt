@@ -2,6 +2,7 @@ package com.cleanyourprojector.launcher
 
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
+import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -19,14 +20,12 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.animation.PathInterpolator
-import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -35,16 +34,10 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cleanyourprojector.launcher.apps.AppInfo
 import com.cleanyourprojector.launcher.apps.AppRepository
-import com.cleanyourprojector.launcher.catalog.HomeRow
-import com.cleanyourprojector.launcher.catalog.JustWatch
-import com.cleanyourprojector.launcher.catalog.Playback
-import com.cleanyourprojector.launcher.catalog.Service
-import com.cleanyourprojector.launcher.catalog.Services
-import com.cleanyourprojector.launcher.catalog.Title
-import com.cleanyourprojector.launcher.catalog.Tmdb
 import com.cleanyourprojector.launcher.graphics.Backdrop
+import com.cleanyourprojector.launcher.home.HomeHost
+import com.cleanyourprojector.launcher.home.HomeTab
 import com.cleanyourprojector.launcher.graphics.Cards
-import com.cleanyourprojector.launcher.graphics.ImageLoader
 import com.cleanyourprojector.launcher.graphics.Layers
 import com.cleanyourprojector.launcher.graphics.Sky
 import com.cleanyourprojector.launcher.graphics.Look
@@ -59,7 +52,6 @@ import com.cleanyourprojector.launcher.system.RemoteLink
 import com.cleanyourprojector.launcher.ui.AppAdapter
 import com.cleanyourprojector.launcher.ui.FocusGridRecyclerView
 import com.cleanyourprojector.launcher.ui.FocusRowRecyclerView
-import com.cleanyourprojector.launcher.ui.HomeRowsAdapter
 import com.cleanyourprojector.launcher.ui.ParkingGridLayoutManager
 import com.cleanyourprojector.launcher.ui.ShelvesRecyclerView
 import com.cleanyourprojector.launcher.ui.SidePanel
@@ -71,11 +63,11 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
-class LauncherActivity : AppCompatActivity() {
+class LauncherActivity : AppCompatActivity(), HomeHost {
 
     private enum class Tab { HOME, APPS, FAVORITES, SETTINGS }
 
-    private lateinit var prefs: Prefs
+    override lateinit var prefs: Prefs
     private lateinit var root: View
     private lateinit var bg: ImageView
     private lateinit var dim: View
@@ -84,7 +76,7 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var tint: View
     private lateinit var scrimLeft: View
     private lateinit var scrimBottom: View
-    private lateinit var panel: SidePanel
+    override lateinit var panel: SidePanel
     private lateinit var tabHome: TextView
     private lateinit var tabApps: TextView
     private lateinit var tabFavorites: TextView
@@ -102,20 +94,17 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var heroSubtitle: TextView
     private lateinit var heroBody: TextView
     private lateinit var row: FocusRowRecyclerView
-    private lateinit var shelves: ShelvesRecyclerView
+    override lateinit var shelves: ShelvesRecyclerView
     private lateinit var empty: View
     private lateinit var emptyTitle: TextView
     private lateinit var emptyHint: TextView
     private lateinit var adapter: AppAdapter
-    private lateinit var shelvesAdapter: HomeRowsAdapter
+    private lateinit var home: HomeTab             // the edition's Home tab
 
     private var allApps: List<AppInfo> = emptyList()
-    private var homeRows: List<HomeRow> = emptyList()
-    private var homeLoadedAt = 0L
-    private var homeLoading = false
-    private var homeGen = 0                    // bumps per Home load so a superseded fetch can't land
     private var tab = Tab.APPS
-    private var heroItem: Any? = null          // AppInfo, Pair<Title, HomeRow> or Tile
+    override var heroItem: Any? = null         // AppInfo, Tile, or the Home tab's own item
+        private set
     private val backdrop = Backdrop()          // what the background shows: a resource id or a file path
     private var userSlot = -1L                 // half-hour slot the user picture was chosen for
     private var artFront = false               // which art layer is visible: false = A, true = B
@@ -125,7 +114,6 @@ class LauncherActivity : AppCompatActivity() {
     private var skyHour = -1
     private var userPick: String? = null
     private var firstLoad = true
-    private var homeFirstShow = true           // cold start lands on the first card even if a tab holds focus
     private var heroGen = 0                    // bumps per hero change so a cancelled fade can't leave it hidden
     private var clockPattern = ""
     private var clockFormat: SimpleDateFormat? = null
@@ -133,14 +121,14 @@ class LauncherActivity : AppCompatActivity() {
     private var lastWallpaperMinute = -1L
 
     private val io = Executors.newSingleThreadExecutor()
-    private val rowsIo = Executors.newFixedThreadPool(3)   // Home shelves fetch side by side
     private val handler = Handler(Looper.getMainLooper())
     private val ease = PathInterpolator(0.2f, 0f, 0f, 1f)
     private val heroRunnable = Runnable {
         when (val it = heroItem) {
+            null -> {}
             is AppInfo -> renderAppHero(it, animate = true)
-            is Pair<*, *> -> renderTitleHero(it.first as Title)
             is Tile -> renderTileHero(it)
+            else -> home.renderHero(it)
         }
     }
 
@@ -153,8 +141,6 @@ class LauncherActivity : AppCompatActivity() {
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) = reloadApps()
     }
-
-    private val region: String get() = prefs.region.ifBlank { Tmdb.defaultRegion() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -212,17 +198,6 @@ class LauncherActivity : AppCompatActivity() {
         row.adapter = adapter
         row.itemAnimator = null
 
-        shelvesAdapter = HomeRowsAdapter(
-            onClick = { t, r -> openTitle(t, r) },
-            onLongClick = { t, r -> titleMenu(t, r) },
-            onFocus = { t, r -> onCardFocused(t to r) },
-            onAppClick = { launchApp(it) },
-            onAppLongClick = { appMenu(it) },
-            onAppFocus = { onCardFocused(it) })
-        shelvesAdapter.upTarget = tabHome
-        shelves.adapter = shelvesAdapter
-        shelves.itemAnimator = null
-
         gridAdapter = AppAdapter(emptyList(),
             onClick = { launchApp(it) },
             onLongClick = { appMenu(it) },
@@ -245,10 +220,12 @@ class LauncherActivity : AppCompatActivity() {
 
         remote = RemoteLink(this) { updateRemoteIndicator(); if (tab == Tab.SETTINGS) refreshTiles() }
 
-        tab = if (Tmdb.configured(this)) Tab.HOME else Tab.APPS
+        home = Edition.home(this)
+        home.onCreate()
+        tab = if (home.startsOnHome) Tab.HOME else Tab.APPS
         row.upTarget = currentTabView()
         grid.upTarget = currentTabView()
-        heroTitle.text = getString(if (tab == Tab.HOME) R.string.home_loading else R.string.loading)
+        heroTitle.text = getString(if (tab == Tab.HOME) home.loadingText else R.string.loading)
         heroSubtitle.text = ""; heroBody.visibility = View.GONE
         underline.post { moveUnderline(currentTabView(), animate = false); paintTabs() }
 
@@ -305,13 +282,13 @@ class LauncherActivity : AppCompatActivity() {
         remote.stop()
     }
 
-    override fun onDestroy() { super.onDestroy(); io.shutdownNow(); rowsIo.shutdownNow() }
+    override fun onDestroy() { super.onDestroy(); io.shutdownNow(); home.onDestroy() }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         panel.close()
         when (tab) {
-            Tab.HOME -> { shelves.scrollToPosition(0); focusFirstShelfCard() }
+            Tab.HOME -> home.scrollToTop()
             Tab.APPS, Tab.SETTINGS -> { grid.scrollToPosition(0); grid.post { firstGridCard()?.requestFocus() } }
             Tab.FAVORITES -> { row.scrollToPosition(0); row.post { firstCard(row)?.requestFocus() } }
         }
@@ -425,6 +402,7 @@ class LauncherActivity : AppCompatActivity() {
         val text = fmt.format(now)
         // Same text means no relayout and no frame: with seconds hidden the screen stays still for a minute.
         if (text != lastClockText) { lastClockText = text; clock.text = text }
+        home.onTick(now)
 
         val minute = now.time / 60_000
         if (minute != lastWallpaperMinute) {
@@ -583,11 +561,18 @@ class LauncherActivity : AppCompatActivity() {
     private fun visibleApps(): List<AppInfo> = if (tab == Tab.FAVORITES) favoriteApps() else allApps
 
     private fun populate(animate: Boolean) {
+        if (tab == Tab.HOME) {
+            row.visibility = View.GONE
+            grid.visibility = View.GONE
+            home.show()
+            return
+        }
+        home.hide()
         when (tab) {
-            Tab.HOME -> populateHome()
             Tab.APPS -> populateGrid(animate)
             Tab.FAVORITES -> populateRow(animate)
             Tab.SETTINGS -> populateSettings()
+            Tab.HOME -> {}
         }
     }
 
@@ -643,7 +628,7 @@ class LauncherActivity : AppCompatActivity() {
         if (prefs.theme.dynamic) { crossfadeArt(null); animateTint(prefs.accentColor) }
     }
 
-    private fun favoriteApps(): List<AppInfo> {
+    override fun favoriteApps(): List<AppInfo> {
         val byPkg = allApps.associateBy { it.packageName }
         return prefs.favorites().mapNotNull { byPkg[it] }
     }
@@ -677,7 +662,7 @@ class LauncherActivity : AppCompatActivity() {
         safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:${app.packageName}")))
     }
 
-    private fun showEmpty(title: Int, hint: Int) {
+    override fun showEmpty(title: Int, hint: Int) {
         emptyTitle.text = getString(title); emptyHint.text = getString(hint)
         empty.visibility = View.VISIBLE
         heroItem = null
@@ -721,118 +706,10 @@ class LauncherActivity : AppCompatActivity() {
         }
     }
 
-    // ---------- home (TMDB) ----------
-    /** Favorites shelf first, then the TMDB shelves (loaded, or skeletons while they load). */
-    private fun displayRows(): List<HomeRow> {
-        val favs = favoriteApps()
-        val favRow = if (favs.isEmpty()) emptyList() else listOf(HomeRow(getString(R.string.tab_favorites), emptyList(), null, null, favs))
-        return favRow + homeRows.filter { it.visible }
-    }
-
-    private fun populateHome() {
-        row.visibility = View.GONE
-        grid.visibility = View.GONE
-        val configured = Tmdb.configured(this)
-        val stale = System.currentTimeMillis() - homeLoadedAt > Tmdb.ROWS_TTL
-        // Kick the fetch first: on a cold start it seeds skeleton shelves so the tab paints at once.
-        if (configured && (stale || homeRows.isEmpty()) && !homeLoading && allApps.isNotEmpty()) loadHome()
-        if (!configured && homeRows.isEmpty() && favoriteApps().isEmpty()) {
-            shelves.visibility = View.GONE
-            shelvesAdapter.submit(emptyList())
-            showEmpty(R.string.home_no_token, R.string.home_no_token_hint)
-            return
-        }
-        renderHome()
-    }
-
-    /** Draw whatever Home has right now: favorites, finished shelves, skeletons; or the empty state. */
-    private fun renderHome() {
-        val rows = displayRows()
-        if (rows.isEmpty()) {
-            shelves.visibility = View.GONE
-            shelvesAdapter.submit(emptyList())
-            showEmpty(R.string.home_empty, R.string.home_empty_hint)
-        } else showShelves(rows)
-    }
-
-    /**
-     * Shelves load one by one, side by side. On a cold start each starts as a skeleton row and is
-     * swapped in as it arrives; a refresh behind rows already on screen swaps them all at the end.
-     */
-    private fun loadHome() {
-        homeLoading = true
-        val gen = ++homeGen
-        val apps = allApps
-        val reg = region
-        val pending = Tmdb.plan(this, apps, reg)
-        val cold = homeRows.isEmpty()
-        if (cold) homeRows = pending.map { it.row }
-        val done = arrayOfNulls<HomeRow>(pending.size)
-        val remaining = java.util.concurrent.atomic.AtomicInteger(pending.size)
-        io.execute {
-            val providers = runCatching { Tmdb.providers(this, reg) }
-                .onFailure { Log.e(TAG, "tmdb providers failed", it) }.getOrDefault(emptyList())
-            pending.forEachIndexed { i, p ->
-                rowsIo.execute {
-                    val r = runCatching { p.load(providers) }
-                        .onFailure { Log.e(TAG, "tmdb row '${p.row.header}' failed", it) }
-                        .getOrDefault(p.row.copy(loading = false))
-                    done[i] = r
-                    val last = remaining.decrementAndGet() == 0
-                    handler.post {
-                        if (gen != homeGen) return@post
-                        if (cold) homeRows = homeRows.map { if (it.header == r.header) r else it }
-                        if (last) {
-                            homeLoading = false
-                            val rows = done.filterNotNull().filter { it.titles.isNotEmpty() }
-                            Log.i(TAG, "home rows: ${rows.map { "${it.header} (${it.titles.size})" }}")
-                            if (rows.isNotEmpty()) { homeRows = rows; homeLoadedAt = System.currentTimeMillis() }
-                            else if (cold) homeRows = emptyList()
-                        }
-                        if ((cold || last) && tab == Tab.HOME) renderHome()
-                    }
-                }
-            }
-        }
-    }
-
-    private fun showShelves(rows: List<HomeRow>) {
-        shelves.visibility = View.VISIBLE
-        empty.visibility = View.GONE
-        val before = currentFocus
-        val focusWasInShelves = before != null && shelves.findContainingItemView(before) != null
-        shelvesAdapter.submit(rows)
-        val focused = currentFocus
-        val focusInShelves = focused != null && shelves.findContainingItemView(focused) != null
-        // A rebind recreated the focused card: put focus back on the first card.
-        if (focusWasInShelves && !focusInShelves) focusFirstShelfCard()
-        if (!focusInShelves && !focusWasInShelves) {
-            // Skeletons only: the hero and the landing focus wait for the first real shelf.
-            val first = rows.firstOrNull { !it.loading } ?: return
-            onCardFocused(if (first.isAppRow) first.apps[0] else first.titles[0] to first)
-            // Cold start (or nothing focused): land on the first card. From a tab: leave focus on the tab.
-            if (focused == null || homeFirstShow) focusFirstShelfCard()
-        }
-        homeFirstShow = false
-        shelvesAdapter.warmUp(shelves)
-    }
-
     private fun firstCard(rv: View?): View? =
         (rv as? FocusRowRecyclerView)?.getChildAt(0)?.findViewById(R.id.card)
 
-    /** First focusable card on screen; skeleton shelves are skipped. */
-    private fun focusFirstShelfCard(attempt: Int = 0) {
-        shelves.post {
-            val card = (0 until shelves.childCount).asSequence()
-                .map { firstCard(shelves.getChildAt(it)?.findViewById(R.id.row_titles)) }
-                .firstOrNull { it?.isFocusable == true }
-            if (card != null) card.requestFocus()
-            else if (attempt < 8 && tab == Tab.HOME) handler.postDelayed({ focusFirstShelfCard(attempt + 1) }, 60)
-            else Log.w(TAG, "first shelf card not found after $attempt attempts")
-        }
-    }
-
-    private fun onCardFocused(item: Any) {
+    override fun onCardFocused(item: Any) {
         if (heroItem == item) return
         heroItem = item
         handler.removeCallbacks(heroRunnable)
@@ -862,29 +739,8 @@ class LauncherActivity : AppCompatActivity() {
         if (prefs.theme.dynamic) { crossfadeArt(ambientFor(app)); animateTint(app.color) }
     }
 
-    private fun renderTitleHero(t: Title) {
-        val subtitle = listOfNotNull(
-            if (t.kind == "tv") "Series" else "Film",
-            t.year,
-            if (t.rating > 0) String.format(Locale.US, "rated %.1f", t.rating) else null
-        ).joinToString(", ")
-        swapHero(animate = true) {
-            heroTitle.text = t.name
-            heroSubtitle.text = subtitle
-            heroBody.text = t.overview
-            heroBody.visibility = if (t.overview.isBlank()) View.GONE else View.VISIBLE
-        }
-        if (!prefs.theme.dynamic) return
-        val url = Tmdb.imageUrl(t.backdrop, "w780") ?: return
-        ImageLoader.fetch(this, url, 800, { bmp -> bmp to AppRepository.colorOf(bmp) }) { res ->
-            if (res == null || (heroItem as? Pair<*, *>)?.first != t || !prefs.theme.dynamic) return@fetch
-            crossfadeArt(BitmapDrawable(resources, res.first).apply { alpha = 0x99 })
-            animateTint(res.second)
-        }
-    }
-
     // ---------- launching ----------
-    private fun launchApp(app: AppInfo) = launchPackage(app.packageName, app.label)
+    override fun launchApp(app: AppInfo) = launchPackage(app.packageName, app.label)
 
     private fun launchPackage(pkg: String, label: String) {
         val intent = AppRepository.launchIntentFor(this, pkg)
@@ -893,71 +749,8 @@ class LauncherActivity : AppCompatActivity() {
         safeStart(intent)
     }
 
-    /** One way to watch a title: an installed app to open, or a service to install. */
-    private class WatchOption(val service: Service, val app: AppInfo?)
-
-    /**
-     * OK on a title: find the services streaming it here, then play it in the one installed app,
-     * offer to install the one missing app, or ask when there is more than one choice.
-     */
-    private fun openTitle(t: Title, r: HomeRow) = watchOptions(t, r) { options ->
-        when (options.size) {
-            0 -> toast("${t.name} isn't streaming in $region right now")
-            1 -> watch(t, options[0])
-            else -> chooseWatchOption(t, options)
-        }
-    }
-
-    /** Long press on a title: always show the full list of services carrying it. */
-    private fun titleMenu(t: Title, r: HomeRow) = watchOptions(t, r) { options ->
-        if (options.isEmpty()) toast("${t.name} isn't streaming in $region right now")
-        else chooseWatchOption(t, options)
-    }
-
-    private fun watchOptions(t: Title, r: HomeRow, cb: (List<WatchOption>) -> Unit) {
-        val apps = allApps; val reg = region
-        io.execute {
-            val services = Services.forTmdbNames(Tmdb.providersFor(this, t, reg)).toMutableList()
-            val installed = Services.installed(apps)
-            // The shelf's own service goes first: that is where the user saw the title.
-            if (r.providerPkg != null) {
-                val shelf = services.firstOrNull { installed[it]?.packageName == r.providerPkg }
-                if (shelf != null) { services.remove(shelf); services.add(0, shelf) }
-            }
-            val options = services.sortedByDescending { installed.containsKey(it) }.map { WatchOption(it, installed[it]) }
-            handler.post { cb(options) }
-        }
-    }
-
-    private fun chooseWatchOption(t: Title, options: List<WatchOption>) {
-        panel.open {
-            Content(t.name, options.map { o ->
-                val label = if (o.app != null) "Open in ${o.app.label}" else "Install ${o.service.name}"
-                Row(label) { panel.close(); watch(t, o) }
-            })
-        }
-    }
-
-    private fun watch(t: Title, o: WatchOption) {
-        val app = o.app
-        if (app == null) {
-            val intent = Playback.storeIntent(this, o.service.storePkg)
-            if (intent == null) toast("Can't open ${o.service.name}") else safeStart(intent)
-            return
-        }
-        val reg = region
-        io.execute {
-            // Per-title link (network, cached); null just means the search link is used instead.
-            val link = runCatching { JustWatch.urlFor(this, t, reg, o.service) }
-                .onFailure { Log.w(TAG, "justwatch ${t.name} failed", it) }.getOrNull()
-            val intent = Playback.playIntent(this, app.packageName, o.service, t.name, link)
-            Log.i(TAG, "watch '${t.name}' in ${app.packageName}: link=$link -> ${intent?.toUri(0)}")
-            handler.post { if (intent == null) toast("Can't open ${o.service.name}") else safeStart(intent) }
-        }
-    }
-
     // ---------- long-press menu (apps) ----------
-    private fun appMenu(app: AppInfo) {
+    override fun appMenu(app: AppInfo) {
         panel.open {
             val fav = prefs.isFavorite(app.packageName)
             val rows = ArrayList<Row>()
@@ -977,7 +770,7 @@ class LauncherActivity : AppCompatActivity() {
     private fun refreshIfFavorites() {
         when (tab) {
             Tab.FAVORITES -> populateRow(animate = false)
-            Tab.HOME -> shelvesAdapter.submit(displayRows())
+            Tab.HOME -> home.onFavoritesChanged()
             Tab.APPS -> {}
             Tab.SETTINGS -> {}
         }
@@ -1023,13 +816,7 @@ class LauncherActivity : AppCompatActivity() {
             rows += Row("24-hour clock", onOff(prefs.clock24h)) { prefs.clock24h = !prefs.clock24h; updateClock(); panel.refresh() }
             rows += Row("Show seconds", onOff(prefs.showSeconds)) { prefs.showSeconds = !prefs.showSeconds; updateClock(); panel.refresh() }
             rows += Row("Remote shortcuts") { shortcutsManager() }
-            rows += Row("Refresh Home") {
-                Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
-                panel.close()
-                if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME)
-            }
-            rows += Row("Region", region) { pickRegion() }
-            rows += Row("TMDB access token", if (Tmdb.configured(this)) "Set" else "Not set") { enterToken() }
+            rows += home.settingsRows()
             rows += Row("Keep Wi-Fi awake in standby", onOff(prefs.keepAwake)) {
                 prefs.keepAwake = !prefs.keepAwake
                 if (prefs.keepAwake) KeepAliveService.start(this) else KeepAliveService.stop(this)
@@ -1072,43 +859,6 @@ class LauncherActivity : AppCompatActivity() {
         }
     }
 
-    private fun pickRegion() {
-        val codes = arrayOf("IN", "US", "GB", "CA", "AU", "DE", "FR", "ES", "IT", "BR", "MX", "JP", "KR", "SG", "AE")
-        panel.open {
-            Content("Region for streaming availability", codes.map { c ->
-                Row(c, checked = c == region) {
-                    if (c != region) {
-                        prefs.region = c
-                        Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
-                        if (tab == Tab.HOME) populateHome()
-                    }
-                    panel.back()
-                }
-            })
-        }
-    }
-
-    private fun enterToken() {
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            hint = "Paste the token here"
-            setText(prefs.tmdbToken)
-            setSingleLine()
-        }
-        panel.open {
-            Content("TMDB access token", listOf(
-                Row("Save") {
-                    prefs.tmdbToken = input.text.toString()
-                    Tmdb.invalidateToken()
-                    Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
-                    panel.close()
-                    if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME)
-                },
-                Row("Cancel") { panel.back() }
-            ), message = "Free at themoviedb.org under Settings, API. It lets Home show what to watch.", input = input)
-        }
-    }
-
     private fun shortcutsManager() {
         panel.open {
             val map = prefs.shortcuts()
@@ -1130,8 +880,32 @@ class LauncherActivity : AppCompatActivity() {
 
     private fun onOff(b: Boolean) = if (b) "On" else "Off"
 
-    private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
-    private fun safeStart(intent: Intent) {
+    // ---------- HomeHost: what the edition's Home tab may use ----------
+    override val activity: Activity get() = this
+    override val homeTabView: View get() = tabHome
+    override val isHomeShowing: Boolean get() = tab == Tab.HOME
+    override fun apps(): List<AppInfo> = allApps
+    override fun settingsTiles(): List<Tile> = tiles()
+    override fun setHero(title: String, subtitle: String, body: String?) {
+        swapHero(animate = true) {
+            heroTitle.text = title
+            heroSubtitle.text = subtitle
+            heroBody.text = body ?: ""
+            heroBody.visibility = if (body.isNullOrBlank()) View.GONE else View.VISIBLE
+        }
+    }
+    override fun paintRoom(art: Bitmap?, color: Int) {
+        if (!(Edition.AMBIENT && prefs.theme.dynamic)) return
+        crossfadeArt(art?.let { BitmapDrawable(resources, it).apply { alpha = 0x99 } })
+        animateTint(color)
+    }
+    override fun setHeroVisible(visible: Boolean) { hero.visibility = if (visible) View.VISIBLE else View.GONE }
+    override fun setStatusClockVisible(visible: Boolean) { clock.visibility = if (visible) View.VISIBLE else View.GONE }
+    override fun hideEmpty() { empty.visibility = View.GONE }
+    override fun showHome() { if (tab == Tab.HOME) populate(animate = false) else selectTab(Tab.HOME) }
+
+    override fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    override fun safeStart(intent: Intent) {
         runCatching { startActivity(intent) }.onFailure { toast("Not available") }
     }
 

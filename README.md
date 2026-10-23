@@ -22,7 +22,8 @@ docs/       Design specs and implementation plans.
 | Package     | What lives there |
 |-------------|------------------|
 | (root)      | `LauncherActivity`, the one screen, and `Prefs`. |
-| `catalog`   | Streaming content: `Tmdb` client, `JustWatch` deep links, `Services` (known streaming apps), `Title`/`HomeRow` models, `Playback` intent building. |
+| `home`      | The Home tab behind `HomeTab`/`HomeHost`: `CatalogHome` (full flavor, TMDB shelves) or `LiteHome` (lite flavor, clock + favorites + quick settings). |
+| `catalog`   | Full flavor only. Streaming content: `Tmdb` client, `JustWatch` deep links, `Services` (known streaming apps), `Title`/`HomeRow` models, `Playback` intent building. |
 | `apps`      | Installed apps: `AppInfo` and `AppRepository`. |
 | `ui`        | RecyclerView adapters, focus-aware RecyclerViews, the parking layout managers and `SidePanel` (every menu). |
 | `graphics`  | Drawing helpers: `Cards`, `Layers`, `Themes` (the built-in looks and `Look`), `Wallpaper`, `ImageLoader`. |
