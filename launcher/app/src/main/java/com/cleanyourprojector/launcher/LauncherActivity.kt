@@ -61,6 +61,7 @@ import com.cleanyourprojector.launcher.ui.TileAdapter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.Executors
 
 class LauncherActivity : AppCompatActivity(), HomeHost {
@@ -401,6 +402,7 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
         }
         val fmt = clockFormat?.takeIf { pattern == clockPattern }
             ?: SimpleDateFormat(pattern, Locale.getDefault()).also { clockFormat = it; clockPattern = pattern }
+        fmt.timeZone = TimeZone.getDefault()   // a cached formatter keeps its zone; the user can change it in Settings
         val text = fmt.format(now)
         // Same text means no relayout and no frame: with seconds hidden the screen stays still for a minute.
         if (text != lastClockText) { lastClockText = text; clock.text = text }

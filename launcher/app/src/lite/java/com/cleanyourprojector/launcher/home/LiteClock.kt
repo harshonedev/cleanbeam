@@ -3,6 +3,7 @@ package com.cleanyourprojector.launcher.home
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 /** The big clock's three lines. Formatters are cached per pattern: this runs once a second. */
 object LiteClock {
@@ -24,6 +25,7 @@ object LiteClock {
         )
     }
 
+    /** A cached formatter keeps the zone it was built with; the user can change the zone in Settings. */
     private fun fmt(pattern: String, locale: Locale): SimpleDateFormat =
-        formats.getOrPut("$pattern|$locale") { SimpleDateFormat(pattern, locale) }
+        formats.getOrPut("$pattern|$locale") { SimpleDateFormat(pattern, locale) }.apply { timeZone = TimeZone.getDefault() }
 }
