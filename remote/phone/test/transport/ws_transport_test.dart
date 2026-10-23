@@ -28,7 +28,7 @@ class FakeProjector {
         if (!authed) {
           if (m['t'] == 'auth' && m['token'] == token) {
             authed = true;
-            ws.add('{"t":"auth_ok","name":"EGate Atom3X","version":"1.0"}');
+            ws.add('{"t":"auth_ok","name":"EGate Atom3X","version":"1.0","ip":"192.168.10.57"}');
           } else if (m['t'] == 'pair' && pin != null && m['code'] == pin) {
             authed = true;
             ws.add('{"t":"pair_ok","token":"$token","name":"EGate Atom3X"}');
@@ -57,6 +57,14 @@ void main() {
     await t.connect();
     expect(t.kind, TransportKind.wifi);
     expect(p.received.first, '{"t":"auth","token":"TOKEN"}');
+    await t.close();
+  });
+
+  test('ws connect records the projector ip from auth_ok', () async {
+    await p.start();
+    final t = WsTransport('127.0.0.1', p.port, token: 'TOKEN');
+    await t.connect();
+    expect(t.projectorIp, '192.168.10.57');
     await t.close();
   });
 

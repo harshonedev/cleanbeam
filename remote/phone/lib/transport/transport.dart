@@ -22,6 +22,9 @@ abstract class Transport {
   /// Connects and authenticates. Completes on auth_ok; throws [AuthFailed] or [TimeoutException].
   Future<void> connect();
 
+  /// The projector's Wi-Fi IPv4 as reported in auth_ok, once [connect] has completed; null if absent.
+  String? get projectorIp => null;
+
   void send(Map<String, dynamic> msg);
 
   Future<void> close();

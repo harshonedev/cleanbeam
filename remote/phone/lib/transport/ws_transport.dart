@@ -31,14 +31,17 @@ class WsTransport implements Transport {
   /// Set after a successful `pair` handshake.
   String? pairedToken;
 
+  @override
+  String? projectorIp;
+
   WsTransport(
     this.host,
     this.port, {
     this.token,
     this.pairCode,
     this.timeout = const Duration(seconds: 3),
-    this.pingInterval = const Duration(seconds: 10),
-    this.silenceLimit = const Duration(seconds: 25),
+    this.pingInterval = const Duration(seconds: 5),
+    this.silenceLimit = const Duration(seconds: 12),
   }) : assert(token != null || pairCode != null);
 
   @override
@@ -72,7 +75,8 @@ class WsTransport implements Transport {
       final event = parseEvent(data as String);
       if (!authDone.isCompleted) {
         switch (event) {
-          case AuthOk():
+          case AuthOk(:final ip):
+            projectorIp = ip;
             _onAuthenticated();
             authDone.complete();
           case PairOk(:final token, :final name):

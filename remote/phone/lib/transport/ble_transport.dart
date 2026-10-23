@@ -24,6 +24,9 @@ class BleTransport implements Transport {
   Future<void> _writeQueue = Future.value();
   String? pairedToken;
 
+  @override
+  String? projectorIp;
+
   BleTransport(this.gatt, {this.token, this.pairCode, this.timeout = const Duration(seconds: 10)})
       : assert(token != null || pairCode != null);
 
@@ -49,7 +52,8 @@ class BleTransport implements Transport {
       final event = parseEvent(utf8.decode(msg));
       if (!authDone.isCompleted) {
         switch (event) {
-          case AuthOk():
+          case AuthOk(:final ip):
+            projectorIp = ip;
             _isConnected = true;
             _connected.add(true);
             authDone.complete();

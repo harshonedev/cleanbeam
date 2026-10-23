@@ -14,13 +14,15 @@ class ScriptedTransport implements Transport {
   final Duration delay;
   final bool succeed;
   final bool rejectAuth;
+  @override
+  final String? projectorIp;
   final _events = StreamController<Event>.broadcast();
   final _connected = StreamController<bool>.broadcast();
   final sent = <Map<String, dynamic>>[];
   bool closed = false;
   int connectCalls = 0;
 
-  ScriptedTransport(this.kind, {this.delay = Duration.zero, this.succeed = true, this.rejectAuth = false});
+  ScriptedTransport(this.kind, {this.delay = Duration.zero, this.succeed = true, this.rejectAuth = false, this.projectorIp});
 
   @override
   Stream<Event> get events => _events.stream;
@@ -400,6 +402,44 @@ void main() {
       async.elapse(const Duration(seconds: 30));
       expect(h.scans - at30, lessThanOrEqualTo(5));
       expect(h.scans, greaterThan(at30)); // still retrying
+      m.stop();
+    });
+  });
+
+  test('a wifi win from the opening round does not replace a wifi link the upgrade already adopted', () {
+    fakeAsync((async) {
+      var wsCalls = 0;
+      final h = Harness(
+        // round's own attempt is slow; the upgrade triggered by the learned ip connects at once
+        makeWs: () => ScriptedTransport(TransportKind.wifi, delay: wsCalls++ == 0 ? const Duration(milliseconds: 2500) : Duration.zero),
+        makeBle: () => ScriptedTransport(TransportKind.ble, delay: const Duration(milliseconds: 100)),
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(milliseconds: 200));
+      expect(m.kind, TransportKind.ble);
+      h.ble.single.emit(const StatusEvent(StatusInfo(screenOn: true, volume: 1, maxVolume: 2, ip: '192.168.10.57')));
+      async.elapse(const Duration(milliseconds: 100));
+      expect(m.kind, TransportKind.wifi);
+      final adopted = m.active;
+      async.elapse(const Duration(seconds: 3));
+      expect(m.active, same(adopted));
+      expect(h.ws.where((w) => !w.closed).length, 1);
+      m.stop();
+    });
+  });
+
+  test('the ip the transport saw in auth_ok is learned on attach', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi, succeed: false),
+        makeBle: () => ScriptedTransport(TransportKind.ble, projectorIp: '192.168.10.58'),
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(milliseconds: 100));
+      expect(m.kind, TransportKind.ble);
+      expect(h.learned, ['192.168.10.58']);
       m.stop();
     });
   });

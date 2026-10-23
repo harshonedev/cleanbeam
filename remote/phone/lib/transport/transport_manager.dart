@@ -161,6 +161,10 @@ class TransportManager extends ChangeNotifier implements CommandSink {
 
     wsFuture.then((t) {
       if (gen != _generation || t == null) return;
+      if (_active?.kind == TransportKind.wifi) {
+        t.close(); // the learned-ip upgrade already moved us to Wi-Fi while this attempt was running
+        return;
+      }
       if (settled && bleWinner == null) {
         t.close(); // another ws already won (cannot happen, but be safe)
         return;
@@ -307,6 +311,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       }
       _events.add(e);
     });
+    _learnIp(t.projectorIp);
     t.send(status());
     _stateSub = t.connected.listen((up) {
       if (!up && _active == t) _onDropped();

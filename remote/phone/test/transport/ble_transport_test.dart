@@ -39,7 +39,7 @@ class FakeGatt implements BleGatt {
     decoded.add(s);
     final m = jsonDecode(s) as Map;
     if (m['t'] == 'auth') {
-      reply(m['token'] == token ? '{"t":"auth_ok","name":"EGate Atom3X","version":"1.0"}' : '{"t":"auth_fail"}');
+      reply(m['token'] == token ? '{"t":"auth_ok","name":"EGate Atom3X","version":"1.0","ip":"192.168.10.57"}' : '{"t":"auth_fail"}');
     } else if (m['t'] == 'apps') {
       final items = List.generate(40, (i) => '{"pkg":"com.example.app$i","label":"Application number $i"}').join(',');
       reply('{"t":"apps","items":[$items]}');
@@ -63,6 +63,14 @@ void main() {
     await t.connect();
     expect(t.kind, TransportKind.ble);
     expect(g.decoded.first, '{"t":"auth","token":"TOKEN"}');
+  });
+
+  test('ble connect records the projector ip from auth_ok', () async {
+    final gatt = FakeGatt();
+    final t = BleTransport(gatt, token: 'TOKEN');
+    await t.connect();
+    expect(t.projectorIp, '192.168.10.57');
+    await t.close();
   });
 
   test('ble connect throws on auth_fail', () async {

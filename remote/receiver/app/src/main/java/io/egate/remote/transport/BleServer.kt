@@ -27,7 +27,6 @@ import io.egate.remote.router.CommandRouter
 import io.egate.remote.router.ConnectionStatus
 import io.egate.remote.router.Session
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
@@ -38,7 +37,7 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
     private var gatt: BluetoothGattServer? = null
     private var advertiser: BluetoothLeAdvertiser? = null
     private lateinit var evtChar: BluetoothGattCharacteristic
-    private val clients = ConcurrentHashMap<String, Client>()
+    private val clients = ClientTable<Client> { it.connection.onClosed() }
 
     private inner class Client(val device: BluetoothDevice) {
         var mtu = 23
@@ -87,7 +86,7 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
                             if (status == BLE_DEVICE_NOT_CONNECTED) {
                                 // No disconnect callback came (phone process killed mid-link); forget it now
                                 // so the pairing screen and status pushes stop counting a dead phone.
-                                if (clients.remove(device.address, this)) { connection.onClosed(); startAdvertising() }
+                                if (clients.removeIf(device.address, this)) startAdvertising()
                             }
                             break
                         }
@@ -222,10 +221,10 @@ class BleServer(private val ctx: Context, private val router: CommandRouter, pri
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                clients[device.address] = Client(device)
+                clients.add(device.address, Client(device))
                 Log.i(TAG, "ble connected ${device.address}")
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                clients.remove(device.address)?.connection?.onClosed()
+                clients.remove(device.address)
                 Log.i(TAG, "ble disconnected ${device.address}")
                 startAdvertising()
             }
