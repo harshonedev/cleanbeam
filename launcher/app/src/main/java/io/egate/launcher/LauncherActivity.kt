@@ -5,6 +5,7 @@ import android.animation.ValueAnimator
 import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -274,7 +275,7 @@ class LauncherActivity : AppCompatActivity() {
 
     /** Vendor apps (jixin settings) re-point the screensaver on boot; reassert ours. */
     private fun ensureScreensaver() {
-        val want = "io.egate.launcher/.ClockDreamService"
+        val want = ComponentName(this, ClockDreamService::class.java).flattenToString()
         try {
             val cur = Settings.Secure.getString(contentResolver, "screensaver_components")
             if (cur != want) {
