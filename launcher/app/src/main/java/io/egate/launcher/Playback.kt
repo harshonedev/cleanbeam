@@ -9,12 +9,14 @@ import android.net.Uri
 object Playback {
 
     /**
-     * Best intent for [title] inside [pkg]: the service's search deep link, then Android TV's
-     * in-app search action, then a plain launch. Each candidate is resolved against the
-     * installed app so an unsupported link degrades to the next one instead of failing.
+     * Best intent for [title] inside [pkg]: the title's own deep link when one is known
+     * (an `intent:` URI or a web URL from [JustWatch]), then the service's search deep link,
+     * then Android TV's in-app search action, then a plain launch. Each candidate is resolved
+     * against the installed app so an unsupported link degrades to the next one instead of failing.
      */
-    fun playIntent(context: Context, pkg: String, service: Service, title: String): Intent? {
+    fun playIntent(context: Context, pkg: String, service: Service, title: String, deepLink: String? = null): Intent? {
         val candidates = ArrayList<Intent>()
+        deepLink?.let { link -> linkIntent(link)?.let { candidates += it } }
         service.searchUrl(title)?.let { candidates += Intent(Intent.ACTION_VIEW, Uri.parse(it)) }
         candidates += Intent(Intent.ACTION_SEARCH).putExtra(SearchManager.QUERY, title)
         for (i in candidates) {
@@ -25,6 +27,17 @@ object Playback {
         }
         return AppRepository.launchIntentFor(context, pkg)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
+
+    /**
+     * A plain VIEW of the URI in [link]. An `intent://…#Intent;…;end` string is parsed only for
+     * its data URI: the link comes from a remote service, so its component, selector, extras,
+     * categories and flags are dropped rather than trusted. The caller pins the package.
+     */
+    private fun linkIntent(link: String): Intent? = runCatching {
+        val uri = if (link.startsWith("intent:")) Intent.parseUri(link, Intent.URI_INTENT_SCHEME).data
+                  else Uri.parse(link)
+        if (uri?.scheme.isNullOrEmpty()) null else Intent(Intent.ACTION_VIEW, uri)
+    }.getOrNull()
 
     /** Play Store page for [pkg]; falls back to the web page when the store app is missing. */
     fun storeIntent(context: Context, pkg: String): Intent? {

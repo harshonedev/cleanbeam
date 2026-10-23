@@ -895,10 +895,21 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun watch(t: Title, o: WatchOption) {
-        val intent = if (o.app != null) Playback.playIntent(this, o.app.packageName, o.service, t.name)
-                     else Playback.storeIntent(this, o.service.storePkg)
-        if (intent == null) { toast("Can't open ${o.service.name}"); return }
-        safeStart(intent)
+        val app = o.app
+        if (app == null) {
+            val intent = Playback.storeIntent(this, o.service.storePkg)
+            if (intent == null) toast("Can't open ${o.service.name}") else safeStart(intent)
+            return
+        }
+        val reg = region
+        io.execute {
+            // Per-title link (network, cached); null just means the search link is used instead.
+            val link = runCatching { JustWatch.urlFor(this, t, reg, o.service) }
+                .onFailure { Log.w("EGate", "justwatch ${t.name} failed", it) }.getOrNull()
+            val intent = Playback.playIntent(this, app.packageName, o.service, t.name, link)
+            Log.i("EGate", "watch '${t.name}' in ${app.packageName}: link=$link -> ${intent?.toUri(0)}")
+            handler.post { if (intent == null) toast("Can't open ${o.service.name}") else safeStart(intent) }
+        }
     }
 
     // ---------- long-press menu (apps) ----------
@@ -981,7 +992,7 @@ class LauncherActivity : AppCompatActivity() {
                 when (which) {
                     0 -> enterToken()
                     1 -> pickRegion()
-                    2 -> { Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0; if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME) }
+                    2 -> { Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0; if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME) }
                     3 -> pickAccent()
                     4 -> { prefs.appGlow = !prefs.appGlow; retint(); showLauncherOptions() }
                     5 -> wallpaperMenu()
@@ -1013,7 +1024,7 @@ class LauncherActivity : AppCompatActivity() {
             .setPositiveButton("Save") { _, _ ->
                 prefs.tmdbToken = input.text.toString()
                 Tmdb.invalidateToken()
-                Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
+                Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
                 if (tab == Tab.HOME) populateHome() else selectTab(Tab.HOME)
             }
             .setNegativeButton("Cancel", null)
@@ -1026,7 +1037,7 @@ class LauncherActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("Region for streaming availability")
             .setSingleChoiceItems(codes, cur) { d, i ->
                 prefs.region = codes[i]
-                Tmdb.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
+                Tmdb.clearCache(this); JustWatch.clearCache(this); homeRows = emptyList(); homeLoadedAt = 0
                 d.dismiss()
                 if (tab == Tab.HOME) populateHome() else showLauncherOptions()
             }.show()
