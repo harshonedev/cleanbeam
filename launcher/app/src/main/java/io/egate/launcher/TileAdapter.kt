@@ -3,6 +3,7 @@ package io.egate.launcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
@@ -15,6 +16,7 @@ class TileAdapter(
 
     class VH(view: View) : RecyclerView.ViewHolder(view) {
         val card: View = view.findViewById(R.id.card)
+        val icon: ImageView = view.findViewById(R.id.tile_icon)
         val title: TextView = view.findViewById(R.id.tile_title)
         val subtitle: TextView = view.findViewById(R.id.tile_subtitle)
     }
@@ -26,6 +28,7 @@ class TileAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val t = items[position]
+        holder.icon.setImageResource(t.icon)
         holder.title.text = t.title
         holder.subtitle.text = t.subtitle
         holder.card.contentDescription = t.title
