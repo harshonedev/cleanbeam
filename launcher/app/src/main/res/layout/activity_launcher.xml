@@ -125,7 +125,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="56dp"
-            android:layout_marginBottom="6dp"
+            android:layout_marginBottom="24dp"
             android:orientation="vertical"
             app:layout_constraintBottom_toTopOf="@id/shelf_top"
             app:layout_constraintStart_toStartOf="parent"
