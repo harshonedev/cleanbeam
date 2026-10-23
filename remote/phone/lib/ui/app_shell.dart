@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../apps/favorites.dart';
 import '../pairing/pairing.dart';
 import '../protocol/message.dart' as msg;
-import '../protocol/message.dart' show AppItem, AppsEvent, Event;
+import '../protocol/message.dart' show AppItem, AppsEvent, Event, ShortcutItem, ShortcutsEvent;
 import '../transport/transport.dart';
 import '../transport/transport_manager.dart';
 import 'apps_screen.dart';
@@ -26,14 +26,17 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _tab = 0;
   List<AppItem> _apps = const [];
+  List<ShortcutItem> _shortcuts = const [];
   StreamSubscription<Event>? _sub;
   TransportKind? _lastKind;
+  bool _authBannerShown = false;
 
   @override
   void initState() {
     super.initState();
     _sub = widget.manager.events.listen((e) {
       if (e is AppsEvent) setState(() => _apps = e.items);
+      if (e is ShortcutsEvent) setState(() => _shortcuts = e.items);
     });
     widget.manager.addListener(_onManager);
     widget.manager.start();
@@ -41,11 +44,31 @@ class _AppShellState extends State<AppShell> {
 
   void _onManager() {
     final k = widget.manager.kind;
-    if (k != null && k != _lastKind) widget.manager.send(msg.apps());
+    if (k != null && k != _lastKind) {
+      widget.manager.send(msg.apps());
+      widget.manager.send(msg.shortcuts());
+    }
     _lastKind = k;
     final err = widget.manager.lastError;
     if (err == 'connection lost' && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connection lost. Reconnecting…')));
+    }
+    if (widget.manager.authFailed && !_authBannerShown && mounted) {
+      _authBannerShown = true;
+      ScaffoldMessenger.of(context).showMaterialBanner(MaterialBanner(
+        backgroundColor: Tokens.raised,
+        content: const Text('The projector was re-paired and no longer accepts this phone.'),
+        actions: [
+          TextButton(
+            key: const Key('banner-pair-again'),
+            onPressed: () async {
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+              await widget.onUnpair();
+            },
+            child: const Text('Pair again'),
+          ),
+        ],
+      ));
     }
   }
 
@@ -63,7 +86,7 @@ class _AppShellState extends State<AppShell> {
     final host = m.activeHost;
     final iconBase = m.kind == TransportKind.wifi && host != null ? 'http://$host:7273' : null;
     final pages = [
-      RemoteScreen(sink: m),
+      RemoteScreen(sink: m, shortcuts: _shortcuts, appLabels: {for (final a in _apps) a.pkg: a.label}),
       AppsScreen(
         sink: m,
         apps: _apps,

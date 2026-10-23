@@ -17,6 +17,8 @@ Map<String, dynamic> apps() => {'t': 'apps'};
 Map<String, dynamic> power(String action) => {'t': 'power', 'action': action};
 Map<String, dynamic> status() => {'t': 'status'};
 Map<String, dynamic> ping() => {'t': 'ping'};
+Map<String, dynamic> shortcuts() => {'t': 'shortcuts'};
+Map<String, dynamic> open(String id) => {'t': 'open', 'id': id};
 
 // ---- projector → phone ----
 
@@ -26,12 +28,23 @@ class AppItem {
   const AppItem(this.pkg, this.label);
 }
 
+/// A projector/system screen the receiver can open on request (`open`).
+class ShortcutItem {
+  final String id;
+  final String label;
+  final String group;
+  const ShortcutItem(this.id, this.label, this.group);
+}
+
 class StatusInfo {
   final String? app;
   final bool screenOn;
   final int volume;
   final int maxVolume;
-  const StatusInfo({this.app, required this.screenOn, required this.volume, required this.maxVolume});
+
+  /// The projector's current Wi-Fi IPv4, when the receiver reports it.
+  final String? ip;
+  const StatusInfo({this.app, required this.screenOn, required this.volume, required this.maxVolume, this.ip});
 }
 
 sealed class Event {
@@ -41,7 +54,8 @@ sealed class Event {
 class AuthOk extends Event {
   final String name;
   final String version;
-  const AuthOk(this.name, this.version);
+  final String? ip;
+  const AuthOk(this.name, this.version, {this.ip});
 }
 
 class AuthFail extends Event {
@@ -66,6 +80,11 @@ class AppsEvent extends Event {
 class StatusEvent extends Event {
   final StatusInfo info;
   const StatusEvent(this.info);
+}
+
+class ShortcutsEvent extends Event {
+  final List<ShortcutItem> items;
+  const ShortcutsEvent(this.items);
 }
 
 class Pong extends Event {
@@ -94,7 +113,7 @@ Event parseEvent(String json) {
   final t = o['t'];
   switch (t) {
     case 'auth_ok':
-      return AuthOk(o['name']?.toString() ?? '', o['version']?.toString() ?? '');
+      return AuthOk(o['name']?.toString() ?? '', o['version']?.toString() ?? '', ip: o['ip']?.toString());
     case 'auth_fail':
       return const AuthFail();
     case 'pair_ok':
@@ -113,7 +132,15 @@ Event parseEvent(String json) {
         screenOn: o['screenOn'] == true,
         volume: (o['volume'] as num?)?.toInt() ?? 0,
         maxVolume: (o['maxVolume'] as num?)?.toInt() ?? 0,
+        ip: o['ip']?.toString(),
       ));
+    case 'shortcuts':
+      final items = (o['items'] as List? ?? const [])
+          .whereType<Map>()
+          .map((m) => ShortcutItem(m['id']?.toString() ?? '', m['label']?.toString() ?? '', m['group']?.toString() ?? ''))
+          .where((i) => i.id.isNotEmpty)
+          .toList();
+      return ShortcutsEvent(items);
     case 'pong':
       return const Pong();
     case 'err':

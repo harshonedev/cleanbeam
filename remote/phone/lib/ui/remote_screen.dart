@@ -7,10 +7,17 @@ import 'keyboard_sheet.dart';
 import 'theme.dart';
 import 'widgets/dpad.dart';
 import 'widgets/hold_button.dart';
+import 'widgets/shortcuts_row.dart';
 
 class RemoteScreen extends StatelessWidget {
   final CommandSink sink;
-  const RemoteScreen({super.key, required this.sink});
+
+  /// Projector/system screens the receiver can open; empty hides the row.
+  final List<msg.ShortcutItem> shortcuts;
+
+  /// Package → label from the receiver's app list, used for the "On …" status line.
+  final Map<String, String> appLabels;
+  const RemoteScreen({super.key, required this.sink, this.shortcuts = const [], this.appLabels = const {}});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +29,7 @@ class RemoteScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         child: Column(
           children: [
-            _StatusLine(sink: sink),
+            _StatusLine(sink: sink, appLabels: appLabels),
             const SizedBox(height: 20),
             DPad(send: sink.send, diameter: dpad),
             const SizedBox(height: 24),
@@ -43,7 +50,7 @@ class RemoteScreen extends StatelessWidget {
               _pill('btn-play', const Icon(Icons.play_arrow_rounded), () => sink.send(msg.key(85))),
               _pill('btn-ffwd', const Icon(Icons.fast_forward_rounded), () => sink.send(msg.key(90))),
             ]),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             _row([
               _pill(
                 'btn-keyboard',
@@ -52,11 +59,18 @@ class RemoteScreen extends StatelessWidget {
               ),
               _pill(
                 'btn-power-menu',
-                const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.power_settings_new_rounded), SizedBox(width: 8), Text('Power menu')]),
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [Icon(Icons.power_settings_new_rounded), SizedBox(width: 8), Text('Power menu')],
+                ),
                 () => sink.send(msg.key(135)),
                 color: Tokens.surface,
               ),
             ]),
+            if (shortcuts.isNotEmpty) ...[
+              const SizedBox(height: 28),
+              ShortcutsRow(items: shortcuts, onOpen: (id) => sink.send(msg.open(id))),
+            ],
           ],
         ),
       ),
@@ -64,31 +78,29 @@ class RemoteScreen extends StatelessWidget {
   }
 
   Widget _row(List<Widget> children) => Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const SizedBox(width: 12),
-            children[i],
-          ]
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(width: 12), children[i]],
+    ],
+  );
 
   Widget _pill(String k, Widget child, VoidCallback onTap, {Color? color}) =>
       HoldButton(key: Key(k), onTap: onTap, color: color, child: child);
 
   Widget _hold(String k, Widget child, int code) => HoldButton(
-        key: Key(k),
-        mode: HoldMode.downUp,
-        onTap: () => sink.send(msg.key(code)),
-        onDown: () => sink.send(msg.key(code, action: 'down')),
-        onUp: () => sink.send(msg.key(code, action: 'up')),
-        child: child,
-      );
+    key: Key(k),
+    mode: HoldMode.downUp,
+    onTap: () => sink.send(msg.key(code)),
+    onDown: () => sink.send(msg.key(code, action: 'down')),
+    onUp: () => sink.send(msg.key(code, action: 'up')),
+    child: child,
+  );
 }
 
 class _StatusLine extends StatelessWidget {
   final CommandSink sink;
-  const _StatusLine({required this.sink});
+  final Map<String, String> appLabels;
+  const _StatusLine({required this.sink, this.appLabels = const {}});
 
   @override
   Widget build(BuildContext context) {
@@ -100,30 +112,43 @@ class _StatusLine extends StatelessWidget {
     } else if (s == null) {
       line = 'Connected';
     } else {
-      final app = s.app == null ? 'Home' : _friendly(s.app!);
+      final app = s.app == null ? 'Home' : friendlyAppName(s.app!, appLabels);
       line = s.screenOn ? 'On $app' : 'Screen off';
     }
     return Row(
       children: [
         Expanded(
-          child: Text(line, style: const TextStyle(color: Tokens.muted, fontSize: 15), overflow: TextOverflow.ellipsis),
+          child: Text(
+            line,
+            style: const TextStyle(color: Tokens.muted, fontSize: 15),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         TransportBadge(kind: kind, connecting: sink.connecting),
       ],
     );
   }
+}
 
-  static String _friendly(String pkg) {
-    const names = {
-      'io.egate.launcher': 'Home',
-      'com.google.android.youtube.tv': 'YouTube',
-      'org.videolan.vlc': 'VLC',
-      'in.startv.hotstar': 'JioHotstar',
-      'com.mxtech.videoplayer.ad': 'MX Player',
-      'com.internet.tvbrowser': 'Browser',
-    };
-    return names[pkg] ?? pkg.split('.').last;
-  }
+/// System and projector packages first (their launcher labels are misleading, e.g. the vendor
+/// settings app lists itself as "More Apps"), then the receiver's app labels, then the package tail.
+String friendlyAppName(String pkg, Map<String, String> appLabels) {
+  const names = {
+    'io.egate.launcher': 'Home',
+    'com.jixin.launcher5': 'Home',
+    'com.jixin.settings5': 'Projector settings',
+    'com.android.tv.settings': 'Settings',
+    'com.jixin.btspeaker': 'Bluetooth',
+    'com.jixin.wifi': 'Wi-Fi',
+    'io.egate.remote': 'Remote pairing',
+    'com.google.android.youtube.tv': 'YouTube',
+    'org.videolan.vlc': 'VLC',
+    'in.startv.hotstar': 'JioHotstar',
+    'com.mxtech.videoplayer.ad': 'MX Player',
+    'com.internet.tvbrowser': 'Browser',
+    'com.android.vending': 'Play Store',
+  };
+  return names[pkg] ?? appLabels[pkg] ?? pkg.split('.').last;
 }
 
 class TransportBadge extends StatelessWidget {
@@ -144,7 +169,10 @@ class TransportBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withValues(alpha: 0.6)),
       ),
-      child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }

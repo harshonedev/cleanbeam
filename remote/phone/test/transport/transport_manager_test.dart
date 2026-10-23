@@ -13,13 +13,14 @@ class ScriptedTransport implements Transport {
   final TransportKind kind;
   final Duration delay;
   final bool succeed;
+  final bool rejectAuth;
   final _events = StreamController<Event>.broadcast();
   final _connected = StreamController<bool>.broadcast();
   final sent = <Map<String, dynamic>>[];
   bool closed = false;
   int connectCalls = 0;
 
-  ScriptedTransport(this.kind, {this.delay = Duration.zero, this.succeed = true});
+  ScriptedTransport(this.kind, {this.delay = Duration.zero, this.succeed = true, this.rejectAuth = false});
 
   @override
   Stream<Event> get events => _events.stream;
@@ -30,6 +31,7 @@ class ScriptedTransport implements Transport {
   Future<void> connect() async {
     connectCalls++;
     await Future.delayed(delay);
+    if (rejectAuth) throw const AuthFailed();
     if (!succeed) throw TimeoutException('nope');
     _connected.add(true);
   }
@@ -49,18 +51,25 @@ class Harness {
   ScriptedTransport Function() makeWs;
   ScriptedTransport Function() makeBle;
   final ws = <ScriptedTransport>[];
+  final wsHosts = <String>[];
   final ble = <ScriptedTransport>[];
+  final learned = <String>[];
   String? mdnsIp;
   String? bleId;
 
   Harness({required this.makeWs, required this.makeBle, this.mdnsIp = '192.168.10.52', this.bleId = 'AA:BB'});
 
-  TransportManager manager() => TransportManager(
+  TransportManager manager({String? initialLearnedIp}) => TransportManager(
         pairing: pairing,
+        learnedIp: initialLearnedIp,
         resolveMdns: (_) async => mdnsIp,
-        makeWs: (_) => makeWs().also(ws.add),
+        makeWs: (host) {
+          wsHosts.add(host);
+          return makeWs().also(ws.add);
+        },
         findBle: () async => bleId,
         makeBle: (_) => makeBle().also(ble.add),
+        onIpLearned: learned.add,
       );
 }
 
@@ -132,6 +141,97 @@ void main() {
       m.start();
       async.elapse(const Duration(seconds: 8));
       expect(m.kind, TransportKind.ble);
+      m.stop();
+    });
+  });
+
+  test('learns the projector ip from status over BLE and moves to wifi at that ip', () {
+    fakeAsync((async) {
+      var wsAttempts = 0;
+      final h = Harness(
+        // saved ip is stale: wifi fails until the learned ip is used
+        makeWs: () {
+          wsAttempts++;
+          return ScriptedTransport(TransportKind.wifi, succeed: wsAttempts > 1);
+        },
+        makeBle: () => ScriptedTransport(TransportKind.ble, delay: const Duration(milliseconds: 200)),
+        mdnsIp: null,
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(seconds: 1));
+      expect(m.kind, TransportKind.ble);
+      expect(h.wsHosts, ['192.168.10.52']);
+      h.ble.first.emit(const StatusEvent(StatusInfo(screenOn: true, volume: 1, maxVolume: 2, ip: '192.168.10.56')));
+      async.elapse(const Duration(milliseconds: 10));
+      expect(h.learned, ['192.168.10.56']);
+      // a new address is tried at once, not after the 15 s retry tick
+      async.elapse(const Duration(milliseconds: 200));
+      expect(h.wsHosts.last, '192.168.10.56');
+      expect(m.kind, TransportKind.wifi);
+      expect(h.ble.first.closed, isTrue);
+      expect(m.activeHost, '192.168.10.56');
+      m.stop();
+    });
+  });
+
+  test('keeps retrying wifi while on BLE and stays on BLE when it keeps failing', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi, succeed: false),
+        makeBle: () => ScriptedTransport(TransportKind.ble),
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(seconds: 1));
+      expect(m.kind, TransportKind.ble);
+      final before = h.ws.length;
+      async.elapse(TransportManager.wifiRetryWhileOnBle * 2 + const Duration(seconds: 1));
+      expect(h.ws.length, greaterThan(before));
+      expect(m.kind, TransportKind.ble);
+      expect(h.ble.single.closed, isFalse);
+      m.stop();
+    });
+  });
+
+  test('a learned ip beats the saved one but mdns beats both', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi, succeed: false),
+        makeBle: () => ScriptedTransport(TransportKind.ble, succeed: false),
+        bleId: null,
+        mdnsIp: null,
+      );
+      final m = h.manager(initialLearnedIp: '192.168.10.60');
+      m.start();
+      async.elapse(const Duration(milliseconds: 100));
+      expect(h.wsHosts, ['192.168.10.60']);
+      h.mdnsIp = '192.168.10.70';
+      async.elapse(const Duration(seconds: 2));
+      expect(h.wsHosts.last, '192.168.10.70');
+      m.stop();
+    });
+  });
+
+  test('a rejected token stops the retry loop and is reported', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi, rejectAuth: true),
+        makeBle: () => ScriptedTransport(TransportKind.ble, rejectAuth: true),
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(milliseconds: 100));
+      expect(m.authFailed, isTrue);
+      expect(m.kind, isNull);
+      expect(m.lastError, contains('no longer accepts'));
+      final attempts = h.ws.length + h.ble.length;
+      async.elapse(const Duration(seconds: 60));
+      expect(h.ws.length + h.ble.length, attempts); // no more attempts
+      m.stop();
+      m.start(); // explicit reconnect tries again
+      async.elapse(const Duration(milliseconds: 100));
+      expect(h.ws.length + h.ble.length, greaterThan(attempts));
       m.stop();
     });
   });

@@ -47,6 +47,13 @@ class _EGateRemoteAppState extends State<EGateRemoteApp> {
         makeWs: (host) => WsTransport(host, p.port, token: p.token),
         findBle: findProjectorBle,
         makeBle: (id) => BleTransport(FlutterBluePlusGatt(deviceFromId(id)), token: p.token),
+        // The projector's DHCP lease moves; remember the address it last reported so the next
+        // Wi-Fi attempt does not depend on mDNS or on the IP printed in the QR code.
+        onIpLearned: (ip) {
+          final updated = p.copyWith(ip: ip);
+          _store.save(updated);
+          _pairing = updated;
+        },
       );
 
   Future<void> _onPaired(Pairing p) async {

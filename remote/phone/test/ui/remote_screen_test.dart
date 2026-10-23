@@ -5,9 +5,14 @@ import 'package:remote_app/ui/remote_screen.dart';
 import 'fake_sink.dart';
 
 void main() {
+  StatusNameTests.run();
   Future<FakeSink> pump(WidgetTester t) async {
     final sink = FakeSink();
-    await t.pumpWidget(MaterialApp(home: Scaffold(body: RemoteScreen(sink: sink))));
+    await t.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RemoteScreen(sink: sink)),
+      ),
+    );
     return sink;
   }
 
@@ -16,7 +21,7 @@ void main() {
     await t.tap(find.byKey(const Key('dpad-ok')));
     await t.pump();
     expect(sink.sent, [
-      {'t': 'key', 'code': 23, 'action': 'tap'}
+      {'t': 'key', 'code': 23, 'action': 'tap'},
     ]);
   });
 
@@ -42,9 +47,15 @@ void main() {
   testWidgets('back home menu volume media and power buttons', (t) async {
     final sink = await pump(t);
     final expected = {
-      'btn-back': 4, 'btn-home': 3, 'btn-menu': 82,
-      'btn-vol-down': 25, 'btn-mute': 164, 'btn-vol-up': 24,
-      'btn-rew': 89, 'btn-play': 85, 'btn-ffwd': 90,
+      'btn-back': 4,
+      'btn-home': 3,
+      'btn-menu': 82,
+      'btn-vol-down': 25,
+      'btn-mute': 164,
+      'btn-vol-up': 24,
+      'btn-rew': 89,
+      'btn-play': 85,
+      'btn-ffwd': 90,
       'btn-power-menu': 135,
     };
     for (final e in expected.entries) {
@@ -59,4 +70,14 @@ void main() {
     await pump(t);
     expect(find.byKey(const Key('btn-wake')), findsNothing);
   });
+}
+
+class StatusNameTests {
+  static void run() {
+    test('status line names: system map, then receiver labels, then package tail', () {
+      expect(friendlyAppName('com.jixin.settings5', {'com.jixin.settings5': 'More Apps'}), 'Projector settings');
+      expect(friendlyAppName('ahaflix.tv', {'ahaflix.tv': 'aha'}), 'aha');
+      expect(friendlyAppName('com.example.thing', {}), 'thing');
+    });
+  }
 }

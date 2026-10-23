@@ -14,5 +14,7 @@ class FakeSink extends ChangeNotifier implements CommandSink {
   @override
   StatusInfo? lastStatus;
   @override
+  bool authFailed = false;
+  @override
   void send(Map<String, dynamic> msg) => sent.add(msg);
 }

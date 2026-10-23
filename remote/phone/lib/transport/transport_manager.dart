@@ -17,10 +17,21 @@ class TransportManager extends ChangeNotifier implements CommandSink {
 
   static const mdnsTimeout = Duration(seconds: 2);
   static const wifiGrace = Duration(seconds: 3);
+
+  /// On Bluetooth the manager keeps probing Wi-Fi this often and moves over as soon as it answers.
+  static const wifiRetryWhileOnBle = Duration(seconds: 15);
   static const backoff = [Duration(seconds: 1), Duration(seconds: 2), Duration(seconds: 4), Duration(seconds: 8)];
+
+  /// Called when the projector reports an IP that differs from what we last used; the app persists it.
+  final void Function(String ip)? onIpLearned;
+
+  /// Last IP the projector told us about (auth_ok / status), tried before the one from pairing.
+  String? learnedIp;
 
   Transport? _active;
   String? _activeHost;
+  Timer? _upgradeTimer;
+  bool _upgrading = false;
   StreamSubscription? _eventSub;
   StreamSubscription? _stateSub;
   final _events = StreamController<Event>.broadcast();
@@ -33,6 +44,8 @@ class TransportManager extends ChangeNotifier implements CommandSink {
   String? lastError;
   @override
   StatusInfo? lastStatus;
+  @override
+  bool authFailed = false;
 
   TransportManager({
     required this.pairing,
@@ -40,6 +53,8 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     required this.makeWs,
     required this.findBle,
     required this.makeBle,
+    this.onIpLearned,
+    this.learnedIp,
   });
 
   Transport? get active => _active;
@@ -56,6 +71,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     if (_started) return;
     _started = true;
     _attempt = 0;
+    authFailed = false;
     _connectRound();
   }
 
@@ -63,6 +79,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     _started = false;
     _generation++;
     _retryTimer?.cancel();
+    _upgradeTimer?.cancel();
     _detach();
   }
 
@@ -96,6 +113,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       _connecting = false;
       lastError = null;
       notifyListeners();
+      if (t.kind == TransportKind.ble) _scheduleUpgrade(gen);
     }
 
     final wsFuture = _tryWifi(gen);
@@ -145,6 +163,33 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     });
   }
 
+  /// While on Bluetooth, probe Wi-Fi periodically (the projector's IP may have changed, or the
+  /// phone's Wi-Fi may have come back) and switch when it answers.
+  void _scheduleUpgrade(int gen, {Duration delay = wifiRetryWhileOnBle}) {
+    _upgradeTimer?.cancel();
+    _upgradeTimer = Timer(delay, () async {
+      if (gen != _generation || _active?.kind != TransportKind.ble || _upgrading) return;
+      _upgrading = true;
+      try {
+        final t = await _tryWifi(gen);
+        if (t == null) return;
+        if (gen != _generation || _active?.kind != TransportKind.ble) {
+          await t.close();
+          return;
+        }
+        debugPrint('[egate] wifi answered; leaving bluetooth');
+        final old = _active;
+        _attach(t);
+        old?.close();
+        lastError = null;
+        notifyListeners();
+      } finally {
+        _upgrading = false;
+        if (gen == _generation && _active?.kind == TransportKind.ble) _scheduleUpgrade(gen);
+      }
+    });
+  }
+
   Future<Transport?> _tryWifi(int gen) async {
     String? host;
     try {
@@ -152,6 +197,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     } catch (_) {
       host = null;
     }
+    host ??= learnedIp;
     host ??= pairing.ip.isEmpty ? null : pairing.ip;
     debugPrint('[egate] wifi: trying ${host ?? "(no host)"}');
     if (host == null || gen != _generation) return null;
@@ -166,7 +212,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       return t;
     } catch (e) {
       debugPrint('[egate] wifi failed: $e');
-      lastError = 'wifi: $e';
+      _failed('wifi', e);
       await t.close();
       return null;
     }
@@ -191,9 +237,18 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       return t;
     } catch (e) {
       debugPrint('[egate] ble failed: $e');
-      lastError = 'ble: $e';
+      _failed('ble', e);
       await t.close();
       return null;
+    }
+  }
+
+  void _failed(String link, Object e) {
+    if (e is AuthFailed) {
+      authFailed = true;
+      lastError = 'The projector no longer accepts this pairing';
+    } else if (!authFailed) {
+      lastError = '$link: $e';
     }
   }
 
@@ -204,7 +259,10 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     _eventSub = t.events.listen((e) {
       if (e is StatusEvent) {
         lastStatus = e.info;
+        _learnIp(e.info.ip);
         notifyListeners();
+      } else if (e is AuthOk) {
+        _learnIp(e.ip);
       }
       _events.add(e);
     });
@@ -212,6 +270,15 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     _stateSub = t.connected.listen((up) {
       if (!up && _active == t) _onDropped();
     });
+  }
+
+  void _learnIp(String? ip) {
+    if (ip == null || ip.isEmpty || ip == learnedIp) return;
+    debugPrint('[egate] projector ip is $ip');
+    learnedIp = ip;
+    onIpLearned?.call(ip);
+    // A fresh address while on Bluetooth is the usual reason Wi-Fi just failed: try it right away.
+    if (_active?.kind == TransportKind.ble && !_upgrading) _scheduleUpgrade(_generation, delay: Duration.zero);
   }
 
   /// Synchronous on purpose: it runs inside the transport's own `connected` callback,
@@ -235,7 +302,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
   }
 
   void _scheduleRetry() {
-    if (!_started) return;
+    if (!_started || authFailed) return; // a rejected token will not start working by itself
     final delay = backoff[_attempt.clamp(0, backoff.length - 1)];
     _attempt++;
     _retryTimer?.cancel();

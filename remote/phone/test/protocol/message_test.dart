@@ -25,6 +25,26 @@ void main() {
   });
 
   group('parseEvent', () {
+    test('shortcuts', () {
+      final e = parseEvent('{"t":"shortcuts","items":[{"id":"input","label":"Input source","group":"Projector"},{"label":"no id"}]}');
+      expect(e, isA<ShortcutsEvent>());
+      final items = (e as ShortcutsEvent).items;
+      expect(items.length, 1);
+      expect(items.single.id, 'input');
+      expect(items.single.label, 'Input source');
+    });
+    test('auth_ok and status carry the ip when present', () {
+      final a = parseEvent('{"t":"auth_ok","name":"n","version":"1","ip":"192.168.10.56"}') as AuthOk;
+      expect(a.ip, '192.168.10.56');
+      final s = parseEvent('{"t":"status","app":null,"screenOn":true,"volume":1,"maxVolume":2,"ip":"192.168.10.56"}') as StatusEvent;
+      expect(s.info.ip, '192.168.10.56');
+      final old = parseEvent('{"t":"status","app":null,"screenOn":true,"volume":1,"maxVolume":2}') as StatusEvent;
+      expect(old.info.ip, isNull);
+    });
+    test('open and shortcuts commands', () {
+      expect(jsonEncode(shortcuts()), '{"t":"shortcuts"}');
+      expect(jsonEncode(open('wifi')), '{"t":"open","id":"wifi"}');
+    });
     test('auth_ok', () {
       final e = parseEvent('{"t":"auth_ok","name":"EGate Atom3X","version":"1.0"}');
       expect(e, isA<AuthOk>());

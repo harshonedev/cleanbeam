@@ -42,7 +42,8 @@ class _AppsScreenState extends State<AppsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...widget.apps]..sort((a, b) {
+    final sorted = [...widget.apps]
+      ..sort((a, b) {
         final fa = _fav.contains(a.pkg), fb = _fav.contains(b.pkg);
         if (fa != fb) return fa ? -1 : 1;
         return a.label.toLowerCase().compareTo(b.label.toLowerCase());
@@ -51,14 +52,22 @@ class _AppsScreenState extends State<AppsScreen> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32),
-          child: Text('No apps yet. Connect to the projector and pull down to refresh.',
-              textAlign: TextAlign.center, style: TextStyle(color: Tokens.muted)),
+          child: Text(
+            'No apps yet. Connect to the projector and pull down to refresh.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Tokens.muted),
+          ),
         ),
       );
     }
     final grid = GridView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 120, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.82),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 120,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.82,
+      ),
       itemCount: sorted.length,
       itemBuilder: (_, i) => _tile(sorted[i]),
     );
@@ -68,43 +77,54 @@ class _AppsScreenState extends State<AppsScreen> {
   Widget _tile(AppItem a) {
     final fav = _fav.contains(a.pkg);
     final base = widget.iconBase;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        widget.sink.send(msg.launch(a.pkg));
-      },
-      onLongPress: () => _toggle(a.pkg),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(color: Tokens.raised, borderRadius: BorderRadius.circular(18)),
-                clipBehavior: Clip.antiAlias,
-                child: base == null
-                    ? _letter(a.label)
-                    : CachedNetworkImage(
-                        imageUrl: '$base/icon/${a.pkg}',
-                        fit: BoxFit.cover,
-                        errorWidget: (_, _, _) => _letter(a.label),
-                        placeholder: (_, _) => _letter(a.label),
-                      ),
-              ),
-              if (fav)
-                const Positioned(right: 2, top: 2, child: Icon(Icons.star_rounded, size: 16, color: Tokens.warn)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(a.label, maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5)),
-        ],
+    return Semantics(
+      button: true,
+      identifier: 'app-${a.pkg}',
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          widget.sink.send(msg.launch(a.pkg));
+        },
+        onLongPress: () => _toggle(a.pkg),
+        child: Column(
+          children: [
+            Stack(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(color: Tokens.raised, borderRadius: BorderRadius.circular(18)),
+                  clipBehavior: Clip.antiAlias,
+                  child: base == null
+                      ? _letter(a.label)
+                      : CachedNetworkImage(
+                          imageUrl: '$base/icon/${a.pkg}',
+                          fit: BoxFit.cover,
+                          errorWidget: (_, _, _) => _letter(a.label),
+                          placeholder: (_, _) => _letter(a.label),
+                        ),
+                ),
+                if (fav) const Positioned(right: 2, top: 2, child: Icon(Icons.star_rounded, size: 16, color: Tokens.warn)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              a.label,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _letter(String label) => Center(
-        child: Text(label.isEmpty ? '?' : label[0].toUpperCase(),
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Tokens.accent)),
-      );
+    child: Text(
+      label.isEmpty ? '?' : label[0].toUpperCase(),
+      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Tokens.accent),
+    ),
+  );
 }

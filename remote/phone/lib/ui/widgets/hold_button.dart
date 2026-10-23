@@ -105,8 +105,11 @@ class _HoldButtonState extends State<HoldButton> {
   Widget build(BuildContext context) {
     final radius = widget.radius ?? BorderRadius.circular(999);
     final color = widget.color ?? Tokens.raised;
+    // The widget key doubles as the accessibility id so UI tests (Maestro) can tap by name.
+    final k = widget.key;
     return Semantics(
       button: true,
+      identifier: k is ValueKey<String> ? k.value : null,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: _start,

@@ -10,4 +10,7 @@ abstract class CommandSink implements Listenable {
   bool get connecting;
   String? get lastError;
   StatusInfo? get lastStatus;
+
+  /// The projector rejected our token (it was re-paired). Retrying is pointless; the user must pair again.
+  bool get authFailed;
 }
