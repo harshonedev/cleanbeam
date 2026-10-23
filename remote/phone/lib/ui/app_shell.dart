@@ -23,7 +23,7 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _tab = 0;
   List<AppItem> _apps = const [];
   List<ShortcutItem> _shortcuts = const [];
@@ -39,7 +39,13 @@ class _AppShellState extends State<AppShell> {
       if (e is ShortcutsEvent) setState(() => _shortcuts = e.items);
     });
     widget.manager.addListener(_onManager);
+    WidgetsBinding.instance.addObserver(this);
     widget.manager.start();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) widget.manager.resumed();
   }
 
   void _onManager() {
@@ -75,6 +81,7 @@ class _AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _sub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     widget.manager.removeListener(_onManager);
     widget.manager.stop();
     super.dispose();

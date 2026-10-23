@@ -56,6 +56,7 @@ class Harness {
   final learned = <String>[];
   String? mdnsIp;
   String? bleId;
+  int scans = 0;
 
   Harness({required this.makeWs, required this.makeBle, this.mdnsIp = '192.168.10.52', this.bleId = 'AA:BB'});
 
@@ -67,7 +68,10 @@ class Harness {
           wsHosts.add(host);
           return makeWs().also(ws.add);
         },
-        findBle: () async => bleId,
+        findBle: () async {
+          scans++;
+          return bleId;
+        },
         makeBle: (_) => makeBle().also(ble.add),
         onIpLearned: learned.add,
       );
@@ -309,6 +313,93 @@ void main() {
       h.ws.first.emit(const Pong());
       async.flushMicrotasks();
       expect(got.single, isA<Pong>());
+      m.stop();
+    });
+  });
+
+  test('a restart waits for the previous round\'s BLE attempt before touching the device again', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi, succeed: false),
+        makeBle: () => ScriptedTransport(TransportKind.ble, delay: const Duration(seconds: 3)),
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(seconds: 1));
+      expect(h.ble.length, 1);
+      m.stop();
+      m.start(); // "Reconnect" while the first BLE connect is still in flight
+      async.elapse(const Duration(seconds: 1));
+      // the device is busy with attempt 1: no second connect() on it yet
+      expect(h.ble.length, 1);
+      async.elapse(const Duration(seconds: 1200));
+      expect(h.ble.first.closed, isTrue); // the stale attempt was discarded
+      expect(h.ble.length, 2);
+      expect(m.kind, TransportKind.ble);
+      expect(m.active, same(h.ble.last));
+      m.stop();
+    });
+  });
+
+  test('resumed() drops a link that does not answer a ping within 2 s', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi),
+        makeBle: () => ScriptedTransport(TransportKind.ble, succeed: false),
+        bleId: null,
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(milliseconds: 100));
+      expect(m.kind, TransportKind.wifi);
+      final ws = h.ws.single;
+      m.resumed();
+      expect(ws.sent.last['t'], 'ping');
+      async.elapse(const Duration(milliseconds: 2100));
+      expect(ws.closed, isTrue);
+      expect(m.lastError, 'connection lost');
+      async.elapse(const Duration(seconds: 2));
+      expect(h.ws.length, 2); // reconnected
+      m.stop();
+    });
+  });
+
+  test('resumed() keeps a link that answers the ping', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi),
+        makeBle: () => ScriptedTransport(TransportKind.ble, succeed: false),
+        bleId: null,
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(milliseconds: 100));
+      final ws = h.ws.single;
+      m.resumed();
+      async.elapse(const Duration(milliseconds: 500));
+      ws.emit(const Pong());
+      async.elapse(const Duration(seconds: 3));
+      expect(ws.closed, isFalse);
+      expect(m.kind, TransportKind.wifi);
+      expect(h.ws.length, 1);
+      m.stop();
+    });
+  });
+
+  test('keeps BLE scans under five per 30 s while nothing answers (Android scan throttle)', () {
+    fakeAsync((async) {
+      final h = Harness(
+        makeWs: () => ScriptedTransport(TransportKind.wifi, succeed: false),
+        makeBle: () => ScriptedTransport(TransportKind.ble, succeed: false),
+      );
+      final m = h.manager();
+      m.start();
+      async.elapse(const Duration(seconds: 30));
+      expect(h.scans, lessThanOrEqualTo(5));
+      final at30 = h.scans;
+      async.elapse(const Duration(seconds: 30));
+      expect(h.scans - at30, lessThanOrEqualTo(5));
+      expect(h.scans, greaterThan(at30)); // still retrying
       m.stop();
     });
   });

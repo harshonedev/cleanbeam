@@ -20,7 +20,12 @@ class TransportManager extends ChangeNotifier implements CommandSink {
 
   /// On Bluetooth the manager keeps probing Wi-Fi this often and moves over as soon as it answers.
   static const wifiRetryWhileOnBle = Duration(seconds: 15);
-  static const backoff = [Duration(seconds: 1), Duration(seconds: 2), Duration(seconds: 4), Duration(seconds: 8)];
+  /// Capped at 20 s: Android silently ignores the 6th BLE scan an app starts within 30 s, and every
+  /// round starts one, so a faster retry loop would leave the phone blind to a projector that just came back.
+  static const backoff = [Duration(seconds: 1), Duration(seconds: 2), Duration(seconds: 4), Duration(seconds: 8), Duration(seconds: 20)];
+
+  /// After the app resumes, the link must answer a ping within this long or it is treated as dead.
+  static const resumeProbe = Duration(seconds: 2);
 
   /// Called when the projector reports an IP that differs from what we last used; the app persists it.
   final void Function(String ip)? onIpLearned;
@@ -40,6 +45,12 @@ class TransportManager extends ChangeNotifier implements CommandSink {
   int _attempt = 0;
   int _generation = 0;
   Timer? _retryTimer;
+  Timer? _liveness;
+
+  /// Completes when every attempt of the latest round has settled. The next round waits for it:
+  /// a stale BLE attempt that is still connecting would otherwise disconnect the very device the
+  /// new round just connected (flutter_blue_plus shares one device object per remote id).
+  Future<void> _inflight = Future.value();
   @override
   String? lastError;
   @override
@@ -75,6 +86,28 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     _connectRound();
   }
 
+  /// Called when the app comes back to the foreground. A socket or GATT link that died while the
+  /// phone slept looks open until something is sent, so probe it now instead of feeding keys into
+  /// a dead link for the next 25 s; with no link up, retry at once rather than after the backoff.
+  void resumed() {
+    final t = _active;
+    if (t == null) {
+      if (_started && !_connecting && _retryTimer?.isActive == true) {
+        _retryTimer!.cancel();
+        _connectRound();
+      }
+      return;
+    }
+    if (_liveness?.isActive == true) return;
+    t.send(ping());
+    _liveness = Timer(resumeProbe, () {
+      if (_active == t) {
+        debugPrint('[egate] no answer after resume; dropping ${t.kind.name}');
+        _onDropped();
+      }
+    });
+  }
+
   Future<void> stop() async {
     _started = false;
     _generation++;
@@ -101,7 +134,13 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     final gen = ++_generation;
     _connecting = true;
     notifyListeners();
+    _inflight.then((_) {
+      if (gen != _generation || !_started) return;
+      _startRound(gen);
+    });
+  }
 
+  void _startRound(int gen) {
     var settled = false;
     Transport? bleWinner;
     Timer? graceTimer;
@@ -118,6 +157,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
 
     final wsFuture = _tryWifi(gen);
     final bleFuture = _tryBle(gen);
+    _inflight = Future.wait([wsFuture, bleFuture]).then((_) {}, onError: (_) {});
 
     wsFuture.then((t) {
       if (gen != _generation || t == null) return;
@@ -257,6 +297,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     _stateSub?.cancel();
     _active = t;
     _eventSub = t.events.listen((e) {
+      _liveness?.cancel();
       if (e is StatusEvent) {
         lastStatus = e.info;
         _learnIp(e.info.ip);
@@ -284,6 +325,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
   /// Synchronous on purpose: it runs inside the transport's own `connected` callback,
   /// where awaiting the subscription cancel would never complete.
   void _detach() {
+    _liveness?.cancel();
     final t = _active;
     _active = null;
     _eventSub?.cancel();
