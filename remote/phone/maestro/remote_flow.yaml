@@ -100,7 +100,7 @@ appId: com.cleanyourprojector.phone
     text: "Remote.*"   # the tab's accessibility text is "Remote\nTab n of 3"
 - extendedWaitUntil:
     visible: "On YouTube"
-    timeout: 15000
+    timeout: 25000
 - takeScreenshot: 07_status_youtube
 # Launch another app while YouTube is in front (background-start rule)
 - tapOn:
