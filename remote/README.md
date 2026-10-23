@@ -18,7 +18,7 @@ The pairing screen shows a QR code and a 6-digit PIN. The PIN is single-use and 
 
 How it works on the projector:
 - `RemoteService` (foreground) owns everything and restarts on boot.
-- It speaks the ADB protocol to the projector's own adbd on `127.0.0.1:3333` (no auth on this userdebug build; uid shell after a cold boot, root after `adb root`) and uses the `exec:` service to launch `nohup setsid … app_process … io.egate.remote.injector.Main --uid <app uid>` (the `shell:` service would kill the child when the stream closes). The helper injects keys and text through `InputManager.injectInputEvent`, drives the pointer by writing evdev events to the vendor `jixin_mouse` device so Android draws a real cursor, and only accepts connections from the receiver app's uid. If the helper dies, the next command respawns it; its stderr is in `/data/local/tmp/egate-injector.log`.
+- It speaks the ADB protocol to the projector's own adbd on `127.0.0.1:3333` (no auth on this userdebug build; uid shell after a cold boot, root after `adb root`) and uses the `exec:` service to launch `nohup setsid … app_process … io.egate.remote.injector.Main --uid <app uid>` (the `shell:` service would kill the child when the stream closes). The helper injects keys and text through `InputManager.injectInputEvent`, types emoji/Hindi/accented text by setting the clipboard (as `com.android.shell`) and pressing Paste, drives the pointer by writing evdev events to the vendor `jixin_mouse` device so Android draws a real cursor, reports the focused app (`ActivityTaskManager`; UsageStats returns nothing to the app on this firmware), and starts apps and settings screens with `am start` because Android blocks activity starts from the service while the receiver has no visible window. It only accepts connections from the receiver app's uid. If the helper dies, the next command respawns it (first start of a new build takes ~5 s of dex verification); its stderr is in `/data/local/tmp/egate-injector.log`.
 - Wi-Fi: `ws://<ip>:7272/`, mDNS `_egate-remote._tcp` as "EGate Atom3X", app icons at `http://<ip>:7273/icon/<pkg>`.
 - BLE: advertises as "EGate Remote" with service `b6517522-6d7b-49d2-8488-664819daea01`.
 
@@ -42,7 +42,22 @@ adb -s <phone> install -r build/app/outputs/flutter-apk/app-debug.apk
 
 First launch: scan the projector's QR, or tap "Enter the 6-digit code instead" (phone and projector must share a Wi-Fi for code pairing). Afterwards the app connects on its own: it tries Wi-Fi (mDNS, then the saved IP) and BLE at the same time and prefers Wi-Fi when both answer within 3 s. The badge in the top right shows which link is in use. With Wi-Fi off the app falls back to BLE and the apps grid shows letter tiles instead of icons.
 
-Screens: **Remote** (D-pad with press-and-hold, Back/Home/Menu, volume, media, "Type" keyboard sheet, "Power menu"), **Apps** (tap to launch, long-press to pin as favourite, pull down to refresh), **Touchpad** (drag to move, tap to click, two fingers to scroll).
+Screens: **Remote** (D-pad with press-and-hold, Back/Home/Menu, volume, media, "Type" keyboard sheet, "Power menu", and a **Quick settings** row: Input source, Wi-Fi, Bluetooth, Focus, Keystone, Brightness, Projection, Projector settings, System settings; the row shows whatever the projector reports it can open), **Apps** (tap to launch, long-press to pin as favourite, pull down to refresh), **Touchpad** (drag to move, tap to click, two fingers to scroll).
+
+The Type sheet sends every keystroke live (backspaces included, by grapheme so an emoji is one delete), has Backspace (hold to repeat), Clear (deletes what was typed from the sheet), Paste (phone clipboard, chunked) and Enter, and shows Live/Offline.
+
+The projector's IP moves with DHCP. The receiver reports its current IP in `auth_ok`/`status`; the app saves it, and when it ends up on Bluetooth (stale IP, mDNS miss) it retries Wi-Fi with the reported address at once and then every 15 s, switching over silently.
+
+### UI flows (Maestro)
+
+```bash
+maestro --device <phone serial> test maestro/remote_flow.yaml      # every control, status line, shortcuts, keyboard, apps, touchpad
+adb -s <phone> shell svc wifi disable && maestro --device <phone> test maestro/ble_flow.yaml
+adb -s <phone> shell svc wifi enable  && maestro --device <phone> test maestro/reconnect_flow.yaml
+maestro --device <phone> test -e PIN=123456 -e IP=192.168.10.56 maestro/pair_with_code.yaml   # app must be unpaired
+```
+
+Buttons carry accessibility ids equal to their widget keys (`dpad-ok`, `btn-home`, `shortcut-input`, `app-<pkg>`, `type-enter`, …).
 
 ## What the projector cannot do
 

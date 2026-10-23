@@ -42,7 +42,7 @@ JSON object, field `t` selects the type. Unknown fields are ignored. Unknown typ
 | `auth` | `token: string` | Must be the first message on a connection. Reply `auth_ok` or `auth_fail`. Connection closed after 3 failed attempts. |
 | `pair` | `code: string` (6 digits) | Alternative first message, only honoured while the projector's pairing screen is open. Reply `pair_ok` (connection is then authenticated) or `pair_fail` (counts as a failed attempt). |
 | `key` | `code: int`, `action: "tap"\|"down"\|"up"` | Android `KeyEvent` keycode. `tap` = down+up in one injection. |
-| `text` | `s: string` | Typed as key events; unmappable characters fall back to `input text`. |
+| `text` | `s: string` | At most 1000 characters per message (longer → `err`). Characters the virtual keyboard can type become key events; runs of anything else (emoji, Devanagari, accents) are put on the projector's clipboard and pasted with `KEYCODE_PASTE`, so they land in any `TextView`. |
 | `mouse` | `dx: int`, `dy: int` | Relative pointer move in pixels. |
 | `click` | `button: "left"\|"right"` | Pointer click at the current position. |
 | `scroll` | `dy: int` | Vertical scroll, positive = down. |
@@ -51,6 +51,8 @@ JSON object, field `t` selects the type. Unknown fields are ignored. Unknown typ
 | `power` | `action: "sleep"\|"wake"\|"reboot"\|"toggle"` | sleep = KEYCODE_SLEEP (223), wake = KEYCODE_WAKEUP (224), toggle = KEYCODE_POWER (26), reboot = `reboot`. |
 | `status` | | Reply `status`. |
 | `ping` | | Reply `pong`. |
+| `shortcuts` | | Request the projector/system screens this box can open. Reply `shortcuts`. |
+| `open` | `id: string` | Open one of them (`input`, `wifi`, `bluetooth`, `focus`, `keystone`, `brightness`, `projection`, `projector_settings`, `system_settings`). Silent on success, `err` when unknown or unavailable. |
 
 Examples:
 
@@ -67,18 +69,21 @@ Examples:
 {"t":"power","action":"sleep"}
 {"t":"status"}
 {"t":"ping"}
+{"t":"shortcuts"}
+{"t":"open","id":"input"}
 ```
 
 ### Projector → phone
 
 | `t` | Fields |
 |-----|--------|
-| `auth_ok` | `name: string`, `version: string` |
+| `auth_ok` | `name: string`, `version: string`, `ip: string` (projector's Wi-Fi IPv4; absent when offline) |
 | `auth_fail` | |
 | `pair_ok` | `token: string`, `name: string` |
 | `pair_fail` | |
 | `apps` | `items: [{pkg: string, label: string}]` |
-| `status` | `app: string\|null` (foreground package), `screenOn: bool`, `volume: int`, `maxVolume: int`. Sent on request and pushed on change while a client is connected. |
+| `status` | `app: string\|null` (foreground package), `screenOn: bool`, `volume: int`, `maxVolume: int`, `ip: string` (as in `auth_ok`). Sent on request and pushed on change while a client is connected. A phone on Bluetooth uses `ip` to find the Wi-Fi link. |
+| `shortcuts` | `items: [{id: string, label: string, group: string}]` in display order; only entries an installed activity handles. |
 | `pong` | |
 | `err` | `msg: string` |
 
@@ -89,10 +94,15 @@ Examples:
 {"t":"auth_fail"}
 {"t":"pair_ok","token":"Z3VpZC10b2tlbi1iYXNlNjQ=","name":"EGate Atom3X"}
 {"t":"apps","items":[{"pkg":"com.google.android.youtube.tv","label":"YouTube"}]}
-{"t":"status","app":"io.egate.launcher","screenOn":true,"volume":7,"maxVolume":15}
+{"t":"status","app":"io.egate.launcher","screenOn":true,"volume":7,"maxVolume":15,"ip":"192.168.10.56"}
+{"t":"shortcuts","items":[{"id":"input","label":"Input source","group":"Projector"},{"id":"wifi","label":"Wi-Fi","group":"Network"}]}
 {"t":"pong"}
 {"t":"err","msg":"unknown type: foo"}
 ```
+
+## Why launches and shortcuts go through the helper
+
+Android refuses `startActivity` from the receiver's foreground service unless the receiver itself has a visible window ("Abort background activity starts"), so `launch` and `open` run `am start` in the injector helper, which is spawned by adbd as shell/root and exempt. Keys are injected with `INJECT_INPUT_EVENT_MODE_WAIT_FOR_RESULT`: with the async mode this firmware accepts D-pad keys but ignores HOME.
 
 ## Pairing QR payload
 

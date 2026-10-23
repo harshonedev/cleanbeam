@@ -1,0 +1,137 @@
+# Every control once, by accessibility id. Assumes the phone is already paired and the projector is on.
+#   maestro --device <serial> test maestro/remote_flow.yaml
+appId: io.egate.remote_app
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "EGate Atom3X"
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: "Wi-Fi|Bluetooth"
+    timeout: 30000
+- takeScreenshot: 01_connected
+# D-pad: right, right, down, OK
+- tapOn:
+    id: "dpad-right"
+- tapOn:
+    id: "dpad-right"
+- tapOn:
+    id: "dpad-down"
+- takeScreenshot: 02_after_dpad
+- tapOn:
+    id: "dpad-ok"
+- tapOn:
+    id: "btn-back"
+- tapOn:
+    id: "btn-home"
+- extendedWaitUntil:
+    visible: "On Home"
+    timeout: 10000
+- takeScreenshot: 03_home
+- tapOn:
+    id: "btn-vol-up"
+- tapOn:
+    id: "btn-vol-down"
+- tapOn:
+    id: "btn-mute"
+- tapOn:
+    id: "btn-mute"
+# Quick settings: Input source, then back
+- scrollUntilVisible:
+    element:
+      id: "shortcut-input"
+    direction: DOWN
+- tapOn:
+    id: "shortcut-input"
+- swipe:
+    direction: DOWN   # back to the top so the status line is on screen
+- extendedWaitUntil:
+    visible: "On Projector settings"
+    timeout: 10000
+- takeScreenshot: 04_input_source
+- tapOn:
+    id: "btn-back"
+- extendedWaitUntil:
+    visible: "On Home"
+    timeout: 10000
+# Keyboard sheet
+- scrollUntilVisible:
+    element:
+      id: "btn-keyboard"
+    direction: DOWN
+- tapOn:
+    id: "btn-keyboard"
+- extendedWaitUntil:
+    visible: "Type on the projector"
+    timeout: 5000
+- assertVisible: "Live"
+- inputText: "cric"
+- takeScreenshot: 05_typing
+- tapOn:
+    id: "type-backspace"
+- tapOn:
+    id: "type-clear"
+- tapOn:
+    id: "type-enter"
+- hideKeyboard
+- back            # closes the sheet (with the keyboard up, back only hides the keyboard)
+- extendedWaitUntil:
+    notVisible: "Type on the projector"
+    timeout: 5000
+- swipe:
+    direction: DOWN
+# Apps tab: launch YouTube, status must follow
+- tapOn:
+    text: "Apps.*"   # the tab's accessibility text is "Apps\nTab n of 3"
+- extendedWaitUntil:
+    visible:
+      id: "app-ahaflix.tv"   # first tile: the app list has arrived
+    timeout: 15000
+- takeScreenshot: 06_apps
+- scrollUntilVisible:
+    element:
+      id: "app-com.google.android.youtube.tv"
+    direction: DOWN
+- tapOn:
+    id: "app-com.google.android.youtube.tv"
+- tapOn:
+    text: "Remote.*"   # the tab's accessibility text is "Remote\nTab n of 3"
+- extendedWaitUntil:
+    visible: "On YouTube"
+    timeout: 15000
+- takeScreenshot: 07_status_youtube
+# Launch another app while YouTube is in front (background-start rule)
+- tapOn:
+    text: "Apps.*"   # the tab's accessibility text is "Apps\nTab n of 3"
+- scrollUntilVisible:
+    element:
+      id: "app-org.videolan.vlc"
+    direction: DOWN
+- tapOn:
+    id: "app-org.videolan.vlc"
+- tapOn:
+    text: "Remote.*"   # the tab's accessibility text is "Remote\nTab n of 3"
+- extendedWaitUntil:
+    visible: "On VLC"
+    timeout: 15000
+- takeScreenshot: 08_status_vlc
+- tapOn:
+    id: "btn-home"
+- extendedWaitUntil:
+    visible: "On Home"
+    timeout: 10000
+# Touchpad
+- tapOn:
+    text: "Touchpad.*"   # the tab's accessibility text is "Touchpad\nTab n of 3"
+- assertVisible: "Drag to move, tap to click,\ntwo fingers to scroll"
+- swipe:
+    start: "30%,40%"
+    end: "70%,60%"
+    duration: 600
+- tapOn: "Left click"
+- takeScreenshot: 09_touchpad
+- tapOn:
+    text: "Remote.*"   # the tab's accessibility text is "Remote\nTab n of 3"
+- takeScreenshot: 10_end

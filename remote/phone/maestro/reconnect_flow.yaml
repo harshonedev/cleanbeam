@@ -1,0 +1,19 @@
+# Wi-Fi comes back while on Bluetooth: the badge must flip to Wi-Fi by itself within ~20 s.
+# Run with Wi-Fi off, then turn it on (adb shell svc wifi enable) once "Bluetooth" is showing.
+appId: io.egate.remote_app
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Bluetooth"
+    timeout: 40000
+- takeScreenshot: reconnect_01_ble
+- extendedWaitUntil:
+    visible: "Wi-Fi"
+    timeout: 60000
+- takeScreenshot: reconnect_02_wifi
+- tapOn:
+    id: "btn-home"
+- extendedWaitUntil:
+    visible: "On Home"
+    timeout: 10000

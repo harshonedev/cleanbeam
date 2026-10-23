@@ -1,0 +1,43 @@
+# Bluetooth path: run with the phone's Wi-Fi off (adb shell svc wifi disable). The badge must say
+# Bluetooth, keys must still move the projector, and status pushes must still arrive.
+appId: io.egate.remote_app
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Bluetooth"
+    timeout: 40000
+- takeScreenshot: ble_01_badge
+- tapOn:
+    id: "btn-home"
+- extendedWaitUntil:
+    visible: "On Home"
+    timeout: 15000
+- tapOn:
+    id: "dpad-right"
+- tapOn:
+    id: "dpad-right"
+- takeScreenshot: ble_02_keys
+- tapOn:
+    text: "Apps.*"   # the tab's accessibility text is "Apps\nTab n of 3"
+- extendedWaitUntil:
+    visible:
+      id: "app-ahaflix.tv"   # first tile: the app list has arrived (letter tiles over BLE)
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "app-com.google.android.youtube.tv"
+    direction: DOWN
+- tapOn:
+    id: "app-com.google.android.youtube.tv"
+- tapOn:
+    text: "Remote.*"   # the tab's accessibility text is "Remote\nTab n of 3"
+- extendedWaitUntil:
+    visible: "On YouTube"
+    timeout: 20000
+- takeScreenshot: ble_03_launch
+- tapOn:
+    id: "btn-home"
+- extendedWaitUntil:
+    visible: "On Home"
+    timeout: 15000
