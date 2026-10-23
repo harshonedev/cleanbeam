@@ -189,6 +189,21 @@
                 tools:text="A retired hitman is pulled back in." />
         </LinearLayout>
 
+        <!-- Lite edition only: the big clock takes the hero's slot while Home shows -->
+        <ViewStub
+            android:id="@+id/home_clock_stub"
+            android:inflatedId="@+id/home_clock"
+            android:layout="@layout/home_clock"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="56dp"
+            android:layout_marginBottom="24dp"
+            app:layout_constraintBottom_toTopOf="@id/shelf_top"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0"
+            app:layout_constraintWidth_percent="0.62" />
+
         <!-- Apps / Settings tabs: vertical grid below the hero, same slot as the Home shelves -->
         <com.cleanyourprojector.launcher.ui.FocusGridRecyclerView
             android:id="@+id/apps_grid"

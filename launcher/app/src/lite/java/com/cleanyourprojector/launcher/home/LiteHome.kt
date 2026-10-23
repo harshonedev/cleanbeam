@@ -4,11 +4,14 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.view.ViewStub
+import android.widget.TextView
 import com.cleanyourprojector.launcher.R
 import com.cleanyourprojector.launcher.ui.FocusRowRecyclerView
 import com.cleanyourprojector.launcher.ui.LiteHomeAdapter
+import java.util.Date
 
-/** Lite's Home tab: the favorites and a few settings as shelves. */
+/** Lite's Home tab: a large clock where the hero was, then the favorites and a few settings as shelves. */
 class LiteHome(host: HomeHost) : HomeTab(host) {
 
     override val startsOnHome: Boolean = true
@@ -17,6 +20,11 @@ class LiteHome(host: HomeHost) : HomeTab(host) {
     private lateinit var adapter: LiteHomeAdapter
     private val handler = Handler(Looper.getMainLooper())
     private var firstShow = true               // cold start lands on the first card even if a tab holds focus
+    private lateinit var clock: View
+    private lateinit var time: TextView
+    private lateinit var ampm: TextView
+    private lateinit var date: TextView
+    private var shown: LiteClock.Text? = null   // what the clock shows; same text means no relayout
 
     override fun onCreate() {
         adapter = LiteHomeAdapter(
@@ -26,7 +34,33 @@ class LiteHome(host: HomeHost) : HomeTab(host) {
         adapter.upTarget = host.homeTabView
         host.shelves.adapter = adapter
         host.shelves.itemAnimator = null
+        clock = host.activity.findViewById<ViewStub>(R.id.home_clock_stub).inflate()
+        time = clock.findViewById(R.id.home_clock_time)
+        ampm = clock.findViewById(R.id.home_clock_ampm)
+        date = clock.findViewById(R.id.home_clock_date)
+        showClock(true)   // Lite starts on Home
     }
+
+    /** The clock stands in for the hero and the small status clock while Home shows. */
+    private fun showClock(on: Boolean) {
+        clock.visibility = if (on) View.VISIBLE else View.GONE
+        host.setHeroVisible(!on)
+        host.setStatusClockVisible(!on)
+        if (on) onTick(Date())
+    }
+
+    override fun onTick(now: Date) {
+        if (clock.visibility != View.VISIBLE) return
+        val t = LiteClock.format(now, host.prefs.clock24h, host.prefs.showSeconds)
+        val was = shown
+        if (t == was) return
+        shown = t
+        if (t.time != was?.time) time.text = t.time
+        if (t.ampm != was?.ampm) { ampm.text = t.ampm; ampm.visibility = if (t.ampm.isEmpty()) View.GONE else View.VISIBLE }
+        if (t.date != was?.date) date.text = t.date
+    }
+
+    override fun hide() { showClock(false) }
 
     private fun rows(): List<LiteRow> = LiteRows.build(
         host.favoriteApps(), LiteRows.quick(host.settingsTiles()),
@@ -34,6 +68,7 @@ class LiteHome(host: HomeHost) : HomeTab(host) {
 
     override fun show() {
         val shelves = host.shelves
+        showClock(true)
         host.hideEmpty()
         shelves.visibility = View.VISIBLE
         val before = host.activity.currentFocus
