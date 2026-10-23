@@ -1,4 +1,4 @@
-package io.egate.launcher.ui
+package com.cleanyourprojector.launcher.ui
 
 import android.view.LayoutInflater
 import android.view.View
@@ -6,13 +6,13 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import io.egate.launcher.R
-import io.egate.launcher.catalog.HomeRow
-import io.egate.launcher.catalog.Title
-import io.egate.launcher.catalog.Tmdb
-import io.egate.launcher.graphics.Cards
-import io.egate.launcher.graphics.ImageLoader
-import io.egate.launcher.graphics.Layers
+import com.cleanyourprojector.launcher.R
+import com.cleanyourprojector.launcher.catalog.HomeRow
+import com.cleanyourprojector.launcher.catalog.Title
+import com.cleanyourprojector.launcher.catalog.Tmdb
+import com.cleanyourprojector.launcher.graphics.Cards
+import com.cleanyourprojector.launcher.graphics.ImageLoader
+import com.cleanyourprojector.launcher.graphics.Layers
 
 class TitleAdapter(
     row: HomeRow,

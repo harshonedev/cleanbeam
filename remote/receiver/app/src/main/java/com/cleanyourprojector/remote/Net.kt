@@ -1,4 +1,4 @@
-package io.egate.remote
+package com.cleanyourprojector.remote
 
 import android.content.Context
 import android.net.wifi.WifiManager

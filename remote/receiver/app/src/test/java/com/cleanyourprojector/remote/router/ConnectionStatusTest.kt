@@ -1,6 +1,6 @@
-package io.egate.remote.router
+package com.cleanyourprojector.remote.router
 
-import io.egate.remote.protocol.AppItem
+import com.cleanyourprojector.remote.protocol.AppItem
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

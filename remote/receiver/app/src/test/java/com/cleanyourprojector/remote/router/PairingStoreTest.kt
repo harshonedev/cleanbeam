@@ -1,6 +1,6 @@
-package io.egate.remote.router
+package com.cleanyourprojector.remote.router
 
-import io.egate.remote.PairingStore
+import com.cleanyourprojector.remote.PairingStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals

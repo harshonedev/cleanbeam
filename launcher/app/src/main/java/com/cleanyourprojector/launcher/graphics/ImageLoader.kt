@@ -1,4 +1,4 @@
-package io.egate.launcher.graphics
+package com.cleanyourprojector.launcher.graphics
 
 import android.content.Context
 import android.graphics.Bitmap

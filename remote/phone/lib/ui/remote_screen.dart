@@ -134,13 +134,13 @@ class _StatusLine extends StatelessWidget {
 /// settings app lists itself as "More Apps"), then the receiver's app labels, then the package tail.
 String friendlyAppName(String pkg, Map<String, String> appLabels) {
   const names = {
-    'io.egate.launcher': 'Home',
+    'com.cleanyourprojector.launcher': 'Home',
     'com.jixin.launcher5': 'Home',
     'com.jixin.settings5': 'Projector settings',
     'com.android.tv.settings': 'Settings',
     'com.jixin.btspeaker': 'Bluetooth',
     'com.jixin.wifi': 'Wi-Fi',
-    'io.egate.remote': 'Remote pairing',
+    'com.cleanyourprojector.remote': 'Remote pairing',
     'com.google.android.youtube.tv': 'YouTube',
     'org.videolan.vlc': 'VLC',
     'in.startv.hotstar': 'JioHotstar',

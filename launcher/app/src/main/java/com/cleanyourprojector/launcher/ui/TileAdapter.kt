@@ -1,4 +1,4 @@
-package io.egate.launcher.ui
+package com.cleanyourprojector.launcher.ui
 
 import android.view.LayoutInflater
 import android.view.View
@@ -6,9 +6,9 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import io.egate.launcher.R
-import io.egate.launcher.graphics.Cards
-import io.egate.launcher.settings.Tile
+import com.cleanyourprojector.launcher.R
+import com.cleanyourprojector.launcher.graphics.Cards
+import com.cleanyourprojector.launcher.settings.Tile
 
 class TileAdapter(
     private val onClick: (Tile) -> Unit,

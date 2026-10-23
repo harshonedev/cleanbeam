@@ -1,4 +1,4 @@
-package io.egate.launcher.system
+package com.cleanyourprojector.launcher.system
 
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -6,11 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
-import io.egate.launcher.apps.AppRepository
+import com.cleanyourprojector.launcher.apps.AppRepository
 
 /**
  * Mirror of the EGate Remote service's connection state (the phone remote app, package
- * io.egate.remote). The service broadcasts [ACTION_STATUS] whenever a phone connects or
+ * com.cleanyourprojector.remote). The service broadcasts [ACTION_STATUS] whenever a phone connects or
  * drops; we ask for a fresh copy with [ACTION_QUERY] each time the launcher resumes.
  */
 class RemoteLink(private val context: Context, private val onChange: () -> Unit) {
@@ -58,9 +58,9 @@ class RemoteLink(private val context: Context, private val onChange: () -> Unit)
     fun pairingIntent(): Intent? = AppRepository.launchIntentFor(context, REMOTE_PKG)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     companion object {
-        const val REMOTE_PKG = "io.egate.remote"
-        const val ACTION_STATUS = "io.egate.remote.STATUS"
-        const val ACTION_QUERY = "io.egate.remote.QUERY_STATUS"
-        const val PERMISSION_STATUS = "io.egate.remote.permission.STATUS"
+        const val REMOTE_PKG = "com.cleanyourprojector.remote"
+        const val ACTION_STATUS = "com.cleanyourprojector.remote.STATUS"
+        const val ACTION_QUERY = "com.cleanyourprojector.remote.QUERY_STATUS"
+        const val PERMISSION_STATUS = "com.cleanyourprojector.remote.permission.STATUS"
     }
 }

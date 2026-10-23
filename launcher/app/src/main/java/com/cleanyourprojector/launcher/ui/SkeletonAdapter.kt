@@ -1,4 +1,4 @@
-package io.egate.launcher.ui
+package com.cleanyourprojector.launcher.ui
 
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
@@ -6,7 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import io.egate.launcher.R
+import com.cleanyourprojector.launcher.R
 
 /** Placeholder cards for a shelf whose titles are still loading: card-shaped, unfocusable, pulsing. */
 class SkeletonAdapter(private val count: Int = 6) : RecyclerView.Adapter<SkeletonAdapter.VH>() {

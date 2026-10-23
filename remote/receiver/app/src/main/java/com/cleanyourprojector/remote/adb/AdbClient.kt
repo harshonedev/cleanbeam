@@ -1,4 +1,4 @@
-package io.egate.remote.adb
+package com.cleanyourprojector.remote.adb
 
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream

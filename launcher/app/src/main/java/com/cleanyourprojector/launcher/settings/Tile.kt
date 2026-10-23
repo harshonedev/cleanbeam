@@ -1,4 +1,4 @@
-package io.egate.launcher.settings
+package com.cleanyourprojector.launcher.settings
 
 import androidx.annotation.DrawableRes
 

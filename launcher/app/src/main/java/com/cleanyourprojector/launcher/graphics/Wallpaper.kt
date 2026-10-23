@@ -1,4 +1,4 @@
-package io.egate.launcher.graphics
+package com.cleanyourprojector.launcher.graphics
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -7,8 +7,8 @@ import java.io.File
 
 /**
  * Wallpapers live in the app's external files dir (no runtime permission needed):
- *   /sdcard/Android/data/io.egate.launcher/files/wallpapers/
- * Push images there with:  adb push pic.jpg /sdcard/Android/data/io.egate.launcher/files/wallpapers/
+ *   /sdcard/Android/data/com.cleanyourprojector.launcher/files/wallpapers/
+ * Push images there with:  adb push pic.jpg /sdcard/Android/data/com.cleanyourprojector.launcher/files/wallpapers/
  */
 object Wallpaper {
 

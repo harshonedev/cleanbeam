@@ -1,4 +1,4 @@
-package io.egate.remote
+package com.cleanyourprojector.remote
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -9,13 +9,13 @@ import android.content.Intent
 import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
-import io.egate.remote.adb.AdbClient
-import io.egate.remote.injector.InjectorClient
-import io.egate.remote.router.AppsHandler
-import io.egate.remote.router.CommandRouter
-import io.egate.remote.router.ConnectionStatus
-import io.egate.remote.transport.BleServer
-import io.egate.remote.transport.WsServer
+import com.cleanyourprojector.remote.adb.AdbClient
+import com.cleanyourprojector.remote.injector.InjectorClient
+import com.cleanyourprojector.remote.router.AppsHandler
+import com.cleanyourprojector.remote.router.CommandRouter
+import com.cleanyourprojector.remote.router.ConnectionStatus
+import com.cleanyourprojector.remote.transport.BleServer
+import com.cleanyourprojector.remote.transport.WsServer
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -75,7 +75,7 @@ class RemoteService : Service() {
 
     private fun pushStatusIfChanged() {
         try {
-            val json = io.egate.remote.protocol.Codec.encodeEvent(router.newConnection(NOOP_SESSION).status())
+            val json = com.cleanyourprojector.remote.protocol.Codec.encodeEvent(router.newConnection(NOOP_SESSION).status())
             if (json != lastStatus) {
                 lastStatus = json
                 ws?.broadcast(json)
@@ -139,8 +139,8 @@ class RemoteService : Service() {
 
     companion object {
         const val TAG = "EGateRemote"
-        const val ACTION_DEBUG_SHELL = "io.egate.remote.DEBUG_SHELL"
-        const val ACTION_DEBUG_INJECT = "io.egate.remote.DEBUG_INJECT"
+        const val ACTION_DEBUG_SHELL = "com.cleanyourprojector.remote.DEBUG_SHELL"
+        const val ACTION_DEBUG_INJECT = "com.cleanyourprojector.remote.DEBUG_INJECT"
 
         /** Live connection state for the pairing screen. */
         val status = ConnectionStatus()
@@ -150,7 +150,7 @@ class RemoteService : Service() {
         private const val CHANNEL_ID = "egate_remote"
         private const val NOTIFICATION_ID = 1
 
-        private val NOOP_SESSION = object : io.egate.remote.router.Session {
+        private val NOOP_SESSION = object : com.cleanyourprojector.remote.router.Session {
             override val label = "internal"
             override fun send(json: String) {}
             override fun close() {}
@@ -173,10 +173,10 @@ class RemoteService : Service() {
         }
 
         /** Launcher-facing status: who is connected and the Bluetooth state. Explicit to our launcher only. */
-        const val ACTION_STATUS = "io.egate.remote.STATUS"
-        const val LAUNCHER_PKG = "io.egate.launcher"
+        const val ACTION_STATUS = "com.cleanyourprojector.remote.STATUS"
+        const val LAUNCHER_PKG = "com.cleanyourprojector.launcher"
         /** Signature permission (declared in our manifest) gating both directions of the status IPC. */
-        const val PERMISSION_STATUS = "io.egate.remote.permission.STATUS"
+        const val PERMISSION_STATUS = "com.cleanyourprojector.remote.permission.STATUS"
 
         fun broadcastStatus(ctx: Context) {
             ctx.sendBroadcast(Intent(ACTION_STATUS)

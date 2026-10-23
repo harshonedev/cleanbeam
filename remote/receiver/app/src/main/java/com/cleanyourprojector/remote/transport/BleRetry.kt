@@ -1,4 +1,4 @@
-package io.egate.remote.transport
+package com.cleanyourprojector.remote.transport
 
 /** Backoff for bringing the GATT server / advertiser up when the Bluetooth stack is not ready yet. */
 object BleRetry {

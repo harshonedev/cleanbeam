@@ -1,6 +1,6 @@
 # Wi-Fi comes back while on Bluetooth: the badge must flip to Wi-Fi by itself within ~20 s.
 # Run with Wi-Fi off, then turn it on (adb shell svc wifi enable) once "Bluetooth" is showing.
-appId: io.egate.remote_app
+appId: com.cleanyourprojector.phone
 ---
 - launchApp:
     stopApp: true

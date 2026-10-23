@@ -1,4 +1,4 @@
-package io.egate.remote
+package com.cleanyourprojector.remote
 
 import android.content.BroadcastReceiver
 import android.content.Context

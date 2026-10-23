@@ -1,4 +1,4 @@
-package io.egate.launcher.apps
+package com.cleanyourprojector.launcher.apps
 
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable

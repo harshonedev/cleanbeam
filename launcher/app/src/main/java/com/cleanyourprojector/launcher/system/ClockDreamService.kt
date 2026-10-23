@@ -1,12 +1,12 @@
-package io.egate.launcher.system
+package com.cleanyourprojector.launcher.system
 
 import android.os.Handler
 import android.os.Looper
 import android.service.dreams.DreamService
 import android.view.View
 import android.widget.TextView
-import io.egate.launcher.Prefs
-import io.egate.launcher.R
+import com.cleanyourprojector.launcher.Prefs
+import com.cleanyourprojector.launcher.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

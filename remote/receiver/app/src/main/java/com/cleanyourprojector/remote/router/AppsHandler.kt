@@ -1,10 +1,10 @@
-package io.egate.remote.router
+package com.cleanyourprojector.remote.router
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.util.Log
-import io.egate.remote.Net
-import io.egate.remote.protocol.ShortcutItem
+import com.cleanyourprojector.remote.Net
+import com.cleanyourprojector.remote.protocol.ShortcutItem
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -14,7 +14,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.media.AudioManager
 import android.os.PowerManager
-import io.egate.remote.protocol.AppItem
+import com.cleanyourprojector.remote.protocol.AppItem
 import java.io.ByteArrayOutputStream
 
 /**
@@ -135,6 +135,6 @@ class AppsHandler(
         private const val TAG = "EGateRemote"
         private const val EVENT_WINDOW_MS = 5 * 60 * 1000L
         private const val STATS_WINDOW_MS = 6 * 60 * 60 * 1000L
-        private val HIDDEN = setOf("io.egate.remote", "io.egate.launcher", "com.jixin.launcher5")
+        private val HIDDEN = setOf("com.cleanyourprojector.remote", "com.cleanyourprojector.launcher", "com.jixin.launcher5")
     }
 }

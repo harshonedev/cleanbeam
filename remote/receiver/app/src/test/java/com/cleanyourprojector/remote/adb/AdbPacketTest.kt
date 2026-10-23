@@ -1,4 +1,4 @@
-package io.egate.remote.adb
+package com.cleanyourprojector.remote.adb
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals

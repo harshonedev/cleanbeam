@@ -1,4 +1,4 @@
-package io.egate.remote.protocol
+package com.cleanyourprojector.remote.protocol
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals

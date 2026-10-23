@@ -1,4 +1,4 @@
-package io.egate.remote
+package com.cleanyourprojector.remote
 
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -66,7 +66,7 @@ class PairingActivity : AppCompatActivity() {
         val address = Net.ipv4(this)
         val payload = JSONObject()
             .put("v", 1)
-            .put("name", io.egate.remote.transport.WsServer.SERVICE_NAME)
+            .put("name", com.cleanyourprojector.remote.transport.WsServer.SERVICE_NAME)
             .put("ip", address ?: "")
             .put("port", 7272)
             .put("token", store.token)

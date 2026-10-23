@@ -1,6 +1,6 @@
-package io.egate.remote.injector
+package com.cleanyourprojector.remote.injector
 
-import io.egate.remote.protocol.KeyAction
+import com.cleanyourprojector.remote.protocol.KeyAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

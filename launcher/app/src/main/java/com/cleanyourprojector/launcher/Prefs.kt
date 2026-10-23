@@ -1,4 +1,4 @@
-package io.egate.launcher
+package com.cleanyourprojector.launcher
 
 import android.content.Context
 import android.graphics.Color

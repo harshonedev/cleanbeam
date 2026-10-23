@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.egate.launcher"
+    namespace = "com.cleanyourprojector.launcher"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "io.egate.launcher"
+        applicationId = "com.cleanyourprojector.launcher"
         minSdk = 28
         targetSdk = 34
         versionCode = 1

@@ -1,4 +1,4 @@
-package io.egate.launcher.apps
+package com.cleanyourprojector.launcher.apps
 
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 
 object AppRepository {
 
-    private val HIDDEN = setOf("io.egate.launcher", "com.jixin.launcher5")
+    private val HIDDEN = setOf("com.cleanyourprojector.launcher", "com.jixin.launcher5")
     private const val FALLBACK = 0xFF5B8CFF.toInt()
     private const val MONTH_MS = 30L * 24 * 60 * 60 * 1000
     /** Banners wider than this are shrunk: a card is ~265px wide, 1.12x when focused. */

@@ -17,7 +17,7 @@ docs/       Design specs and implementation plans.
 
 ## Launcher source layout
 
-`launcher/app/src/main/java/io/egate/launcher/`
+`launcher/app/src/main/java/com/cleanyourprojector/launcher/`
 
 | Package     | What lives there |
 |-------------|------------------|
@@ -41,4 +41,4 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 The Home tab needs a TMDB token: either paste it in Settings, or push it to
-`/sdcard/Android/data/io.egate.launcher/files/tmdb.key`.
+`/sdcard/Android/data/com.cleanyourprojector.launcher/files/tmdb.key`.

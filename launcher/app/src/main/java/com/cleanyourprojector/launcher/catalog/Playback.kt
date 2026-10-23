@@ -1,10 +1,10 @@
-package io.egate.launcher.catalog
+package com.cleanyourprojector.launcher.catalog
 
 import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import io.egate.launcher.apps.AppRepository
+import com.cleanyourprojector.launcher.apps.AppRepository
 
 /** Builds the intent that gets a title playing (or as close as the app allows) and the Play Store intent. */
 object Playback {

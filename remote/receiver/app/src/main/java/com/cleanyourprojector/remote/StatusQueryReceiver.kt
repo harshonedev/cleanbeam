@@ -1,4 +1,4 @@
-package io.egate.remote
+package com.cleanyourprojector.remote
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -12,5 +12,5 @@ class StatusQueryReceiver : BroadcastReceiver() {
         RemoteService.broadcastStatus(context)
     }
 
-    companion object { const val ACTION_QUERY = "io.egate.remote.QUERY_STATUS" }
+    companion object { const val ACTION_QUERY = "com.cleanyourprojector.remote.QUERY_STATUS" }
 }

@@ -1,11 +1,11 @@
-package io.egate.launcher.settings
+package com.cleanyourprojector.launcher.settings
 
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.annotation.DrawableRes
-import io.egate.launcher.R
+import com.cleanyourprojector.launcher.R
 
 /**
  * Entries of the Settings quick menu that open system or vendor screens. Each entry lists

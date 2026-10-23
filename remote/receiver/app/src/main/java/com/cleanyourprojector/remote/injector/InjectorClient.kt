@@ -1,9 +1,9 @@
-package io.egate.remote.injector
+package com.cleanyourprojector.remote.injector
 
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.util.Log
-import io.egate.remote.adb.AdbClient
+import com.cleanyourprojector.remote.adb.AdbClient
 import java.io.BufferedReader
 import java.io.Closeable
 import java.io.IOException
@@ -84,7 +84,7 @@ class InjectorClient(
                         AdbClient.connectAny().use {
                             // adbd kills the shell's children when the stream closes, so detach the
                             // helper into its own session; its stderr goes to a log for debugging.
-                            val launch = "CLASSPATH=$apkPath exec app_process /system/bin io.egate.remote.injector.Main --uid $appUid"
+                            val launch = "CLASSPATH=$apkPath exec app_process /system/bin com.cleanyourprojector.remote.injector.Main --uid $appUid"
                             it.exec("nohup setsid sh -c '$launch' </dev/null >$HELPER_LOG 2>&1 &", timeoutMs = 3_000)
                         }
                     } catch (e: Exception) {

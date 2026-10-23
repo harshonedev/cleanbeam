@@ -1,4 +1,4 @@
-package io.egate.remote.transport
+package com.cleanyourprojector.remote.transport
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

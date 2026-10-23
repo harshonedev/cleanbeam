@@ -1,4 +1,4 @@
-package io.egate.remote.injector
+package com.cleanyourprojector.remote.injector
 
 import java.io.File
 import java.io.FileOutputStream

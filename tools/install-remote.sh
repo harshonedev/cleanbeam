@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 export ANDROID_SERIAL
 if [[ "${1:-}" == "--build" ]]; then (cd remote/receiver && ./gradlew assembleDebug -q); fi
 APK=remote/receiver/app/build/outputs/apk/debug/app-debug.apk
-PKG=io.egate.remote
+PKG=com.cleanyourprojector.remote
 adb install -r "$APK"
 adb shell pm grant $PKG android.permission.BLUETOOTH_CONNECT || true
 adb shell pm grant $PKG android.permission.BLUETOOTH_ADVERTISE || true

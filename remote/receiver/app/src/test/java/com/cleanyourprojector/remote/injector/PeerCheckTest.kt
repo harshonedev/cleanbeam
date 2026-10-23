@@ -1,4 +1,4 @@
-package io.egate.remote.injector
+package com.cleanyourprojector.remote.injector
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

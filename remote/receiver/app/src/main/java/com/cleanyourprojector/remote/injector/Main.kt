@@ -1,18 +1,18 @@
-package io.egate.remote.injector
+package com.cleanyourprojector.remote.injector
 
 import android.net.LocalServerSocket
 import android.net.LocalSocket
 import android.os.Looper
 import android.os.Process
-import io.egate.remote.protocol.Codec
-import io.egate.remote.protocol.Command
+import com.cleanyourprojector.remote.protocol.Codec
+import com.cleanyourprojector.remote.protocol.Command
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
 
 /**
  * Entry point run under app_process (as shell/root) by the receiver app:
- *   CLASSPATH=<apk> app_process /system/bin io.egate.remote.injector.Main
+ *   CLASSPATH=<apk> app_process /system/bin com.cleanyourprojector.remote.injector.Main
  * Reads newline-delimited JSON commands from a LocalServerSocket and injects them.
  */
 object Main {
@@ -35,7 +35,7 @@ object Main {
         val sink = AndroidSink()
         val injector = InputInjector(sink, sink)
         if ("selftest" in args) {
-            injector.key(20, io.egate.remote.protocol.KeyAction.TAP)
+            injector.key(20, com.cleanyourprojector.remote.protocol.KeyAction.TAP)
             System.err.println("selftest: injected DPAD_DOWN")
         }
         val name = socketName(allowedUid)

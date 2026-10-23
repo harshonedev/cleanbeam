@@ -1,4 +1,4 @@
-package io.egate.remote
+package com.cleanyourprojector.remote
 
 import android.content.Context
 import java.security.MessageDigest
@@ -6,7 +6,7 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /** Holds the long-lived pairing token and the short-lived on-screen pairing PIN. */
-class PairingStore(private val backing: Backing) : io.egate.remote.router.Credentials {
+class PairingStore(private val backing: Backing) : com.cleanyourprojector.remote.router.Credentials {
 
     interface Backing {
         fun read(): String?

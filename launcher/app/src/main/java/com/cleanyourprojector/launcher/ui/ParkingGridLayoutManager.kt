@@ -1,4 +1,4 @@
-package io.egate.launcher.ui
+package com.cleanyourprojector.launcher.ui
 
 import android.content.Context
 import android.graphics.Rect

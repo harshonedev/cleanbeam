@@ -1,4 +1,4 @@
-package io.egate.remote_app
+package com.cleanyourprojector.phone
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,6 +1,6 @@
-package io.egate.remote.injector
+package com.cleanyourprojector.remote.injector
 
-import io.egate.remote.protocol.KeyAction
+import com.cleanyourprojector.remote.protocol.KeyAction
 
 /**
  * Turns remote commands into input events. All Android calls go through [Sink] so the logic

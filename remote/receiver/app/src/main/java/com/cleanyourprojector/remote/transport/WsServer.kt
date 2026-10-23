@@ -1,13 +1,13 @@
-package io.egate.remote.transport
+package com.cleanyourprojector.remote.transport
 
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import fi.iki.elonen.NanoHTTPD
-import io.egate.remote.router.AppsHandler
-import io.egate.remote.router.CommandRouter
-import io.egate.remote.router.Session
+import com.cleanyourprojector.remote.router.AppsHandler
+import com.cleanyourprojector.remote.router.CommandRouter
+import com.cleanyourprojector.remote.router.Session
 import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
 import org.java_websocket.server.WebSocketServer

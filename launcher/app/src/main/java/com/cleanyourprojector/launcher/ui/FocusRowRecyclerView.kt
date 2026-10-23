@@ -1,11 +1,11 @@
-package io.egate.launcher.ui
+package com.cleanyourprojector.launcher.ui
 
 import android.content.Context
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewParent
 import androidx.recyclerview.widget.RecyclerView
-import io.egate.launcher.graphics.Cards
+import com.cleanyourprojector.launcher.graphics.Cards
 
 /**
  * Horizontal shelf that keeps the focused card parked at the start padding (leanback style),

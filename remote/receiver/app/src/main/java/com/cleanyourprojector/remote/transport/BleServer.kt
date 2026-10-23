@@ -1,4 +1,4 @@
-package io.egate.remote.transport
+package com.cleanyourprojector.remote.transport
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -22,10 +22,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import android.util.Log
-import io.egate.remote.protocol.Chunker
-import io.egate.remote.router.CommandRouter
-import io.egate.remote.router.ConnectionStatus
-import io.egate.remote.router.Session
+import com.cleanyourprojector.remote.protocol.Chunker
+import com.cleanyourprojector.remote.router.CommandRouter
+import com.cleanyourprojector.remote.router.ConnectionStatus
+import com.cleanyourprojector.remote.router.Session
 import java.util.UUID
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit

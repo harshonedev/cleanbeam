@@ -1,4 +1,4 @@
-package io.egate.launcher.ui
+package com.cleanyourprojector.launcher.ui
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -11,8 +11,8 @@ import android.view.animation.PathInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import io.egate.launcher.R
-import io.egate.launcher.apps.AppInfo
+import com.cleanyourprojector.launcher.R
+import com.cleanyourprojector.launcher.apps.AppInfo
 
 class AppAdapter(
     private var items: List<AppInfo>,

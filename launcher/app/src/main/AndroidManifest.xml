@@ -20,8 +20,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Status IPC with EGate Remote. Declared here too so whichever of our apps installs first
          defines it at signature level and no third-party app can squat on the name. -->
-    <permission android:name="io.egate.remote.permission.STATUS" android:protectionLevel="signature" />
-    <uses-permission android:name="io.egate.remote.permission.STATUS" />
+    <permission android:name="com.cleanyourprojector.remote.permission.STATUS" android:protectionLevel="signature" />
+    <uses-permission android:name="com.cleanyourprojector.remote.permission.STATUS" />
     <!-- Wi-Fi SSID and paired Bluetooth names on the Settings tab; granted once with adb pm grant. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

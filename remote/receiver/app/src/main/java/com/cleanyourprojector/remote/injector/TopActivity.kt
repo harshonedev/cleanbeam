@@ -1,4 +1,4 @@
-package io.egate.remote.injector
+package com.cleanyourprojector.remote.injector
 
 import android.content.ComponentName
 

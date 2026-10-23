@@ -1,4 +1,4 @@
-package io.egate.remote.router
+package com.cleanyourprojector.remote.router
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList

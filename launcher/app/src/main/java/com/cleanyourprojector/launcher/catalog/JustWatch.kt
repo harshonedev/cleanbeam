@@ -1,4 +1,4 @@
-package io.egate.launcher.catalog
+package com.cleanyourprojector.launcher.catalog
 
 import android.content.Context
 import android.util.Log

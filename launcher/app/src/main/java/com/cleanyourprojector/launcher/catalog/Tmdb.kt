@@ -1,9 +1,9 @@
-package io.egate.launcher.catalog
+package com.cleanyourprojector.launcher.catalog
 
 import android.content.Context
 import android.util.Log
-import io.egate.launcher.Prefs
-import io.egate.launcher.apps.AppInfo
+import com.cleanyourprojector.launcher.Prefs
+import com.cleanyourprojector.launcher.apps.AppInfo
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -19,7 +19,7 @@ import org.json.JSONObject
  *
  * Auth: a v4 read access token (starts with "eyJ") goes in the Authorization header,
  * a v3 key goes in the query string. The token comes from prefs or from
- *   /sdcard/Android/data/io.egate.launcher/files/tmdb.key
+ *   /sdcard/Android/data/com.cleanyourprojector.launcher/files/tmdb.key
  */
 object Tmdb {
 

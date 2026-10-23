@@ -15,7 +15,7 @@
         android:textSize="14sp"
         android:fontFamily="sans-serif-medium" />
 
-    <io.egate.launcher.ui.FocusRowRecyclerView
+    <com.cleanyourprojector.launcher.ui.FocusRowRecyclerView
         android:id="@+id/row_titles"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

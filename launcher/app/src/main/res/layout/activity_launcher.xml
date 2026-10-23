@@ -182,7 +182,7 @@
         </LinearLayout>
 
         <!-- Apps / Settings tabs: vertical grid below the hero, same slot as the Home shelves -->
-        <io.egate.launcher.ui.FocusGridRecyclerView
+        <com.cleanyourprojector.launcher.ui.FocusGridRecyclerView
             android:id="@+id/apps_grid"
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -197,7 +197,7 @@
             app:layout_constraintStart_toStartOf="parent" />
 
         <!-- app row -->
-        <io.egate.launcher.ui.FocusRowRecyclerView
+        <com.cleanyourprojector.launcher.ui.FocusRowRecyclerView
             android:id="@+id/row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -208,7 +208,7 @@
             app:layout_constraintTop_toTopOf="@id/shelf_top"
             app:layout_constraintStart_toStartOf="parent" />
 
-        <io.egate.launcher.ui.ShelvesRecyclerView
+        <com.cleanyourprojector.launcher.ui.ShelvesRecyclerView
             android:id="@+id/shelves"
             android:layout_width="match_parent"
             android:layout_height="0dp"

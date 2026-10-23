@@ -1,4 +1,4 @@
-package io.egate.launcher.ui
+package com.cleanyourprojector.launcher.ui
 
 import android.os.Looper
 import android.view.LayoutInflater
@@ -8,10 +8,10 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import io.egate.launcher.R
-import io.egate.launcher.apps.AppInfo
-import io.egate.launcher.catalog.HomeRow
-import io.egate.launcher.catalog.Title
+import com.cleanyourprojector.launcher.R
+import com.cleanyourprojector.launcher.apps.AppInfo
+import com.cleanyourprojector.launcher.catalog.HomeRow
+import com.cleanyourprojector.launcher.catalog.Title
 
 /** Vertical list of shelves; each shelf is a header plus a horizontal FocusRowRecyclerView. */
 class HomeRowsAdapter(

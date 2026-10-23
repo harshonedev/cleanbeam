@@ -1,4 +1,4 @@
-package io.egate.launcher.catalog
+package com.cleanyourprojector.launcher.catalog
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

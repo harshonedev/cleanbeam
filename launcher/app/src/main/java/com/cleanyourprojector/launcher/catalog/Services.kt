@@ -1,6 +1,6 @@
-package io.egate.launcher.catalog
+package com.cleanyourprojector.launcher.catalog
 
-import io.egate.launcher.apps.AppInfo
+import com.cleanyourprojector.launcher.apps.AppInfo
 import java.net.URLEncoder
 
 /**

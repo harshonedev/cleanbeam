@@ -94,7 +94,7 @@ Examples:
 {"t":"auth_fail"}
 {"t":"pair_ok","token":"Z3VpZC10b2tlbi1iYXNlNjQ=","name":"EGate Atom3X"}
 {"t":"apps","items":[{"pkg":"com.google.android.youtube.tv","label":"YouTube"}]}
-{"t":"status","app":"io.egate.launcher","screenOn":true,"volume":7,"maxVolume":15,"ip":"192.168.10.56"}
+{"t":"status","app":"com.cleanyourprojector.launcher","screenOn":true,"volume":7,"maxVolume":15,"ip":"192.168.10.56"}
 {"t":"shortcuts","items":[{"id":"input","label":"Input source","group":"Projector"},{"id":"wifi","label":"Wi-Fi","group":"Network"}]}
 {"t":"pong"}
 {"t":"err","msg":"unknown type: foo"}

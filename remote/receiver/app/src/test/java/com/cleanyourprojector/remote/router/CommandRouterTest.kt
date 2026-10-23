@@ -1,7 +1,7 @@
-package io.egate.remote.router
+package com.cleanyourprojector.remote.router
 
-import io.egate.remote.protocol.AppItem
-import io.egate.remote.protocol.ShortcutItem
+import com.cleanyourprojector.remote.protocol.AppItem
+import com.cleanyourprojector.remote.protocol.ShortcutItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,7 +18,7 @@ private class FakeApps : AppsProvider {
     val launched = mutableListOf<String>()
     override fun list() = listOf(AppItem("com.google.android.youtube.tv", "YouTube"))
     override fun launch(pkg: String): Boolean { launched += pkg; return true }
-    override fun foregroundApp(): String? = "io.egate.launcher"
+    override fun foregroundApp(): String? = "com.cleanyourprojector.launcher"
     override fun volume(): Pair<Int, Int> = 7 to 15
     override fun screenOn(): Boolean = true
     val opened = mutableListOf<String>()
@@ -135,7 +135,7 @@ class CommandRouterTest {
         val (c, s) = authed()
         c.onMessage("""{"t":"status"}""")
         c.onMessage("""{"t":"ping"}""")
-        assertEquals("""{"t":"status","app":"io.egate.launcher","screenOn":true,"volume":7,"maxVolume":15}""", s.sent[1])
+        assertEquals("""{"t":"status","app":"com.cleanyourprojector.launcher","screenOn":true,"volume":7,"maxVolume":15}""", s.sent[1])
         assertEquals("""{"t":"pong"}""", s.sent[2])
     }
 
@@ -157,7 +157,7 @@ class CommandRouterTest {
         val (c, s) = authed()
         assertEquals("""{"t":"auth_ok","name":"EGate Atom3X","version":"1.0","ip":"192.168.10.56"}""", s.sent[0])
         c.onMessage("""{"t":"status"}""")
-        assertEquals("""{"t":"status","app":"io.egate.launcher","screenOn":true,"volume":7,"maxVolume":15,"ip":"192.168.10.56"}""", s.sent[1])
+        assertEquals("""{"t":"status","app":"com.cleanyourprojector.launcher","screenOn":true,"volume":7,"maxVolume":15,"ip":"192.168.10.56"}""", s.sent[1])
     }
 
     @Test

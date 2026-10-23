@@ -1,11 +1,11 @@
-package io.egate.remote.router
+package com.cleanyourprojector.remote.router
 
-import io.egate.remote.protocol.AppItem
-import io.egate.remote.protocol.Codec
-import io.egate.remote.protocol.Command
-import io.egate.remote.protocol.Event
-import io.egate.remote.protocol.KeyAction
-import io.egate.remote.protocol.ShortcutItem
+import com.cleanyourprojector.remote.protocol.AppItem
+import com.cleanyourprojector.remote.protocol.Codec
+import com.cleanyourprojector.remote.protocol.Command
+import com.cleanyourprojector.remote.protocol.Event
+import com.cleanyourprojector.remote.protocol.KeyAction
+import com.cleanyourprojector.remote.protocol.ShortcutItem
 
 /** One connected phone, regardless of transport. */
 interface Session {

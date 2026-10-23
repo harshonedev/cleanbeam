@@ -1,10 +1,10 @@
-package io.egate.remote.router
+package com.cleanyourprojector.remote.router
 
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import io.egate.remote.protocol.ShortcutItem
+import com.cleanyourprojector.remote.protocol.ShortcutItem
 
 /**
  * Projector and system screens the phone can jump to. Each entry lists candidate intents, most

@@ -1,4 +1,4 @@
-package io.egate.remote.protocol
+package com.cleanyourprojector.remote.protocol
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -42,8 +42,8 @@ class MessageTest {
 
     @Test
     fun `encodes status`() {
-        val json = Codec.encodeEvent(Event.Status("io.egate.launcher", true, 7, 15))
-        assertEquals("""{"t":"status","app":"io.egate.launcher","screenOn":true,"volume":7,"maxVolume":15}""", json)
+        val json = Codec.encodeEvent(Event.Status("com.cleanyourprojector.launcher", true, 7, 15))
+        assertEquals("""{"t":"status","app":"com.cleanyourprojector.launcher","screenOn":true,"volume":7,"maxVolume":15}""", json)
     }
 
     @Test

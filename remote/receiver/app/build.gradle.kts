@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.egate.remote"
+    namespace = "com.cleanyourprojector.remote"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "io.egate.remote"
+        applicationId = "com.cleanyourprojector.remote"
         minSdk = 28
         targetSdk = 34
         versionCode = 1

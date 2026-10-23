@@ -1,6 +1,6 @@
 # Every control once, by accessibility id. Assumes the phone is already paired and the projector is on.
 #   maestro --device <serial> test maestro/remote_flow.yaml
-appId: io.egate.remote_app
+appId: com.cleanyourprojector.phone
 ---
 - launchApp:
     stopApp: true

@@ -1,9 +1,9 @@
-package io.egate.launcher.system
+package com.cleanyourprojector.launcher.system
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import io.egate.launcher.Prefs
+import com.cleanyourprojector.launcher.Prefs
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

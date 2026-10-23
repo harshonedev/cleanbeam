@@ -1,4 +1,4 @@
-package io.egate.launcher.settings
+package com.cleanyourprojector.launcher.settings
 
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager

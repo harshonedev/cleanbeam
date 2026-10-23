@@ -1,4 +1,4 @@
-package io.egate.remote.transport
+package com.cleanyourprojector.remote.transport
 
 import java.util.concurrent.ConcurrentHashMap
 

@@ -4,8 +4,8 @@ Phone remote control for the EGate Atom 3X projector. Two apps, one protocol (`P
 
 | Part | Where | What |
 |------|-------|------|
-| Receiver | `receiver/` (Kotlin, `io.egate.remote`) | Runs on the projector. Listens over Wi-Fi (WebSocket) and Bluetooth LE, injects key/pointer/text input. |
-| Phone app | `phone/` (Flutter, `io.egate.remote_app`) | Android now, iOS later from the same code. D-pad, apps grid, touchpad, keyboard. |
+| Receiver | `receiver/` (Kotlin, `com.cleanyourprojector.remote`) | Runs on the projector. Listens over Wi-Fi (WebSocket) and Bluetooth LE, injects key/pointer/text input. |
+| Phone app | `phone/` (Flutter, `com.cleanyourprojector.phone`) | Android now, iOS later from the same code. D-pad, apps grid, touchpad, keyboard. |
 
 ## Receiver: build, install, pair
 
@@ -18,11 +18,11 @@ The pairing screen shows a QR code and a 6-digit PIN. The PIN is single-use and 
 
 How it works on the projector:
 - `RemoteService` (foreground) owns everything and restarts on boot.
-- It speaks the ADB protocol to the projector's own adbd on `127.0.0.1:3333` (no auth on this userdebug build; uid shell after a cold boot, root after `adb root`) and uses the `exec:` service to launch `nohup setsid … app_process … io.egate.remote.injector.Main --uid <app uid>` (the `shell:` service would kill the child when the stream closes). The helper injects keys and text through `InputManager.injectInputEvent`, types emoji/Hindi/accented text by setting the clipboard (as `com.android.shell`) and pressing Paste, drives the pointer by writing evdev events to the vendor `jixin_mouse` device so Android draws a real cursor, reports the focused app (`ActivityTaskManager`; UsageStats returns nothing to the app on this firmware), and starts apps and settings screens with `am start` because Android blocks activity starts from the service while the receiver has no visible window. It only accepts connections from the receiver app's uid. If the helper dies, the next command respawns it (first start of a new build takes ~5 s of dex verification); its stderr is in `/data/local/tmp/egate-injector.log`.
+- It speaks the ADB protocol to the projector's own adbd on `127.0.0.1:3333` (no auth on this userdebug build; uid shell after a cold boot, root after `adb root`) and uses the `exec:` service to launch `nohup setsid … app_process … com.cleanyourprojector.remote.injector.Main --uid <app uid>` (the `shell:` service would kill the child when the stream closes). The helper injects keys and text through `InputManager.injectInputEvent`, types emoji/Hindi/accented text by setting the clipboard (as `com.android.shell`) and pressing Paste, drives the pointer by writing evdev events to the vendor `jixin_mouse` device so Android draws a real cursor, reports the focused app (`ActivityTaskManager`; UsageStats returns nothing to the app on this firmware), and starts apps and settings screens with `am start` because Android blocks activity starts from the service while the receiver has no visible window. It only accepts connections from the receiver app's uid. If the helper dies, the next command respawns it (first start of a new build takes ~5 s of dex verification); its stderr is in `/data/local/tmp/egate-injector.log`.
 - Wi-Fi: `ws://<ip>:7272/`, mDNS `_egate-remote._tcp` as "EGate Atom3X", app icons at `http://<ip>:7273/icon/<pkg>`.
 - BLE: advertises as "EGate Remote" with service `b6517522-6d7b-49d2-8488-664819daea01`.
 
-Smoke test from the Mac (token is in `/data/data/io.egate.remote/shared_prefs/pairing.xml`):
+Smoke test from the Mac (token is in `/data/data/com.cleanyourprojector.remote/shared_prefs/pairing.xml`):
 
 ```bash
 node tools/wsctl.mjs 192.168.10.52 <token> '{"t":"key","code":20,"action":"tap"}' '{"t":"apps"}' '{"t":"status"}'
@@ -67,7 +67,7 @@ Buttons carry accessibility ids equal to their widget keys (`dpad-ok`, `btn-home
 ## Rollback
 
 ```bash
-adb uninstall io.egate.remote      # helper dies at next reboot, or: adb shell pkill -f injector.Main
+adb uninstall com.cleanyourprojector.remote      # helper dies at next reboot, or: adb shell pkill -f injector.Main
 ```
 
 Nothing else on the projector is changed.

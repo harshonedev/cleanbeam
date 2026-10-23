@@ -1,4 +1,4 @@
-package io.egate.launcher.graphics
+package com.cleanyourprojector.launcher.graphics
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable

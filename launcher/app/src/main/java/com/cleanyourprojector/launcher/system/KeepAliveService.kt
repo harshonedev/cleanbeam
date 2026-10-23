@@ -1,4 +1,4 @@
-package io.egate.launcher.system
+package com.cleanyourprojector.launcher.system
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,7 +10,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import io.egate.launcher.R
+import com.cleanyourprojector.launcher.R
 
 /**
  * Holds a high-performance Wi-Fi lock and a partial wake lock so the box stays
