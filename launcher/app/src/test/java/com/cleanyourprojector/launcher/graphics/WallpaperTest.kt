@@ -26,3 +26,14 @@ class WallpaperTest {
         assertEquals("a", Wallpaper.pick(pics, 3 * tenMin, tenMin))
     }
 }
+
+class WallpaperHintTest {
+    @Test fun `empty folder asks for pictures and names the folder`() {
+        assertEquals("No pictures yet. Copy some to:\n/x/wallpapers", Wallpaper.hint(0, "/x/wallpapers"))
+    }
+
+    @Test fun `a folder with pictures counts them and names the folder`() {
+        assertEquals("1 picture, a new one every half hour. Add more at:\n/x/wallpapers", Wallpaper.hint(1, "/x/wallpapers"))
+        assertEquals("3 pictures, a new one every half hour. Add more at:\n/x/wallpapers", Wallpaper.hint(3, "/x/wallpapers"))
+    }
+}

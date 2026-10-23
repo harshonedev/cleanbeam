@@ -32,6 +32,13 @@ object Wallpaper {
 
     const val HALF_HOUR_MS = 30 * 60 * 1000L
 
+    /** What the theme list says under "My wallpaper": where to put pictures, and how many there are. */
+    fun hint(count: Int, dir: String): String = when (count) {
+        0 -> "No pictures yet. Copy some to:\n$dir"
+        1 -> "1 picture, a new one every half hour. Add more at:\n$dir"
+        else -> "$count pictures, a new one every half hour. Add more at:\n$dir"
+    }
+
     /** Decode one image downsampled to roughly the screen size, 16-bit: half the memory of ARGB. */
     fun load(path: String, reqW: Int, reqH: Int): Bitmap? {
         return try {

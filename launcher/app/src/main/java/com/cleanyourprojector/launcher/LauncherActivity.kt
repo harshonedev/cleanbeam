@@ -839,12 +839,12 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
     /** Picking a theme applies it at once, behind the panel, so the list doubles as a preview. */
     private fun pickTheme() {
         panel.open {
-            val noPictures = prefs.theme.userWallpaper && Wallpaper.images(this).isEmpty()
+            val hint = if (prefs.theme.userWallpaper) Wallpaper.hint(Wallpaper.images(this).size, Wallpaper.dir(this).absolutePath) else null
             Content("Theme", Themes.ALL.mapIndexed { i, t ->
                 Row(t.name, checked = i == prefs.themeIndex) {
                     if (prefs.themeIndex != i) { prefs.themeIndex = i; applyTheme(); refreshTilesIfSettings(); panel.refresh() }
                 }
-            }, message = if (noPictures) "No pictures yet. Copy some to:\n${Wallpaper.dir(this).absolutePath}" else null)
+            }, message = hint)
         }
     }
 
