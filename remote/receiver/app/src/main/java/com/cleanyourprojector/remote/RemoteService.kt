@@ -87,7 +87,10 @@ class RemoteService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        // Debug-only control surface: runs a shell command / injector message from an Intent extra.
+        // The service is android:exported="false" (same-uid/adb only), but keep it out of release
+        // builds entirely so no shipped build carries a shell backdoor.
+        if (BuildConfig.DEBUG) when (intent?.action) {
             ACTION_DEBUG_SHELL -> {
                 val cmd = intent.getStringExtra("cmd") ?: "id"
                 executor.execute {
