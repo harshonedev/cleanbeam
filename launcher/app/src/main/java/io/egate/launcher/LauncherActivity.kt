@@ -58,12 +58,7 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var clock: TextView
     private lateinit var wifi: ImageView
     private lateinit var phone: ImageView
-    private lateinit var actions: View
-    private lateinit var actOpen: TextView
-    private lateinit var actPin: TextView
-    private lateinit var actShortcut: TextView
-    private lateinit var actInfo: TextView
-    private lateinit var grid: RecyclerView
+    private lateinit var grid: FocusGridRecyclerView
     private lateinit var gridAdapter: AppAdapter
     private lateinit var tileAdapter: TileAdapter
     private lateinit var remote: RemoteLink
@@ -146,11 +141,6 @@ class LauncherActivity : AppCompatActivity() {
         clock = findViewById(R.id.clock)
         wifi = findViewById(R.id.wifi)
         phone = findViewById(R.id.phone)
-        actions = findViewById(R.id.actions)
-        actOpen = findViewById(R.id.act_open)
-        actPin = findViewById(R.id.act_pin)
-        actShortcut = findViewById(R.id.act_shortcut)
-        actInfo = findViewById(R.id.act_info)
         grid = findViewById(R.id.apps_grid)
         hero = findViewById(R.id.hero)
         heroTitle = findViewById(R.id.hero_title)
@@ -215,15 +205,12 @@ class LauncherActivity : AppCompatActivity() {
             val lm = grid.layoutManager as GridLayoutManager
             if (lm.spanCount != cols) grid.post { lm.spanCount = cols }
         }
-        actOpen.setOnClickListener { (heroItem as? AppInfo)?.let { launchApp(it) } }
-        actPin.setOnClickListener { (heroItem as? AppInfo)?.let { prefs.toggleFavorite(it.packageName); refreshIfFavorites(); bindActions(it) } }
-        actShortcut.setOnClickListener { (heroItem as? AppInfo)?.let { captureShortcut(it) } }
-        actInfo.setOnClickListener { (heroItem as? AppInfo)?.let { appInfo(it) } }
 
         remote = RemoteLink(this) { updateRemoteIndicator(); if (tab == Tab.SETTINGS) refreshTiles() }
 
         tab = if (Tmdb.configured(this)) Tab.HOME else Tab.APPS
         row.upTarget = currentTabView()
+        grid.upTarget = currentTabView()
         heroTitle.text = getString(if (tab == Tab.HOME) R.string.home_loading else R.string.loading)
         heroSubtitle.text = ""; heroMeta.visibility = View.GONE
         underline.post { moveUnderline(currentTabView(), animate = false); paintTabs() }
@@ -382,6 +369,7 @@ class LauncherActivity : AppCompatActivity() {
         if (tab == t) { paintTabs(); return }
         tab = t
         row.upTarget = currentTabView()
+        grid.upTarget = currentTabView()
         paintTabs()
         populate(animate = true)
     }
@@ -517,7 +505,6 @@ class LauncherActivity : AppCompatActivity() {
     private fun visibleApps(): List<AppInfo> = if (tab == Tab.FAVORITES) favoriteApps() else allApps
 
     private fun populate(animate: Boolean) {
-        actions.visibility = if (tab == Tab.APPS) View.VISIBLE else View.GONE
         when (tab) {
             Tab.HOME -> populateHome()
             Tab.APPS -> populateGrid(animate)
@@ -529,7 +516,7 @@ class LauncherActivity : AppCompatActivity() {
     // ---------- settings tab: quick-action tiles ----------
     private fun tiles(): List<Tile> {
         val out = ArrayList<Tile>()
-        out += Tile("Phone remote", "Remote", remote.summary()) {
+        out += Tile("Phone remote", "Remote", remote.summary(), R.drawable.ic_phone) {
             remote.pairingIntent()?.let { safeStart(it) } ?: toast("EGate Remote isn't installed")
         }
         for ((s, intent) in SystemShortcuts.available(this)) {
@@ -541,10 +528,10 @@ class LauncherActivity : AppCompatActivity() {
                 "Projector settings" -> DeviceInfo.firmware()
                 else -> s.detail
             }
-            out += Tile(s.label, s.group, detail) { safeStart(intent) }
+            out += Tile(s.label, s.group, detail, s.icon) { safeStart(intent) }
         }
         val ver = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?"
-        out += Tile("Launcher", "This launcher", "EGate Home $ver  ·  accent ${Prefs.ACCENTS[prefs.accentIndex].name}  ·  region $region") { showLauncherOptions() }
+        out += Tile("Launcher", "This launcher", "EGate Home $ver  ·  accent ${Prefs.ACCENTS[prefs.accentIndex].name}  ·  region $region", R.drawable.ic_home) { showLauncherOptions() }
         return out
     }
 
@@ -604,7 +591,6 @@ class LauncherActivity : AppCompatActivity() {
         val focusInGrid = focused != null && grid.findContainingItemView(focused) != null
         if (focusInGrid || focused == null) grid.post { if (!focusInside(grid)) firstGridCard()?.requestFocus() }
         keepOrResetHero(allApps, focusInGrid)
-        (heroItem as? AppInfo)?.let { bindActions(it) }
     }
 
     private fun firstGridCard(): View? = grid.getChildAt(0)?.findViewById(R.id.card)
@@ -612,10 +598,6 @@ class LauncherActivity : AppCompatActivity() {
     private fun focusInside(rv: RecyclerView): Boolean {
         val f = currentFocus ?: return false
         return rv.findContainingItemView(f) != null
-    }
-
-    private fun bindActions(app: AppInfo) {
-        actPin.text = if (prefs.isFavorite(app.packageName)) "Unpin" else "Pin"
     }
 
     private fun appInfo(app: AppInfo) {
@@ -798,7 +780,6 @@ class LauncherActivity : AppCompatActivity() {
     }
 
     private fun renderAppHero(app: AppInfo, animate: Boolean) {
-        if (tab == Tab.APPS) bindActions(app)
         val subtitle = listOfNotNull(
             app.category?.let { "$it app" },
             shortVersion(app.version)?.let { "version $it" }
@@ -943,7 +924,7 @@ class LauncherActivity : AppCompatActivity() {
         when (tab) {
             Tab.FAVORITES -> populateRow(animate = false)
             Tab.HOME -> shelvesAdapter.submit(displayRows())
-            Tab.APPS -> (heroItem as? AppInfo)?.let { bindActions(it) }
+            Tab.APPS -> {}
             Tab.SETTINGS -> {}
         }
     }

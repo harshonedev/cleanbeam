@@ -179,25 +179,10 @@
                 android:ellipsize="end"
                 android:visibility="gone"
                 tools:text="A retired hitman is pulled back in." />
-
-            <!-- Apps tab: actions for the selected app -->
-            <LinearLayout
-                android:id="@+id/actions"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:orientation="horizontal"
-                android:visibility="gone">
-
-                <TextView android:id="@+id/act_open" style="@style/Pill" android:text="Open" />
-                <TextView android:id="@+id/act_pin" style="@style/Pill" android:text="Pin" />
-                <TextView android:id="@+id/act_shortcut" style="@style/Pill" android:text="Remote button" />
-                <TextView android:id="@+id/act_info" style="@style/Pill" android:text="App info" />
-            </LinearLayout>
         </LinearLayout>
 
         <!-- Apps / Settings tabs: vertical grid below the hero, same slot as the Home shelves -->
-        <androidx.recyclerview.widget.RecyclerView
+        <io.egate.launcher.FocusGridRecyclerView
             android:id="@+id/apps_grid"
             android:layout_width="match_parent"
             android:layout_height="0dp"
