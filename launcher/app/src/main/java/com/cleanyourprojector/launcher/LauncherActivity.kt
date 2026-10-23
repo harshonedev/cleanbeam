@@ -521,10 +521,11 @@ class LauncherActivity : AppCompatActivity(), HomeHost {
 
     /** The user's picture for this half hour; the folder is listed once per slot, not every minute. */
     private fun userPicture(): String? {
-        val slot = System.currentTimeMillis() / (30 * 60 * 1000)
+        val now = System.currentTimeMillis()
+        val slot = now / Wallpaper.HALF_HOUR_MS
         if (slot != userSlot) {
             userSlot = slot
-            userPick = Wallpaper.images(this).takeIf { it.isNotEmpty() }?.let { it[(slot % it.size).toInt()].path }
+            userPick = Wallpaper.pick(Wallpaper.images(this).map { it.path }, now, Wallpaper.HALF_HOUR_MS)
         }
         return userPick
     }

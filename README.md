@@ -11,7 +11,7 @@ remote/     Phone remote. See remote/README.md for pairing and the injector.
   phone/      Flutter app (Android, iOS) with D-pad, apps grid, touchpad, keyboard.
   receiver/   Android service on the projector: WebSocket + BLE server that injects input.
   PROTOCOL.md Wire protocol between phone and receiver.
-tools/      Shell and Node scripts used from a laptop over adb (debloat, restore, install remote).
+tools/      Shell and Node scripts used from a laptop over adb (debloat, restore, install remote, push wallpapers).
 docs/       Design specs and implementation plans.
 ```
 
@@ -43,6 +43,21 @@ adb install -r app/build/outputs/apk/full/debug/app-full-debug.apk    # or lite/
 
 The Full edition's Home tab needs a TMDB token: either paste it in Settings, or push it to
 `/sdcard/Android/data/com.cleanyourprojector.launcher/files/tmdb.key`.
+
+### Your own wallpapers
+
+Both editions show your pictures: the "My wallpaper" theme puts one behind the launcher (a new
+one every half hour), and the screensaver puts one behind its clock (a new one every ten minutes),
+dimmed by the theme's "Picture dim" setting. Copy them over with
+
+```sh
+tools/push-wallpapers.sh [-c] ~/Pictures/some.jpg ...     # -c empties the folder first
+```
+
+which lands in `/sdcard/Android/data/com.cleanyourprojector.launcher/files/wallpapers/`.
+jpg/png/webp, best at 1920x1080: the box has 1 GB of RAM and decodes each one itself.
+To preview the screensaver without waiting: `adb shell service call dreams 1` starts it and
+`service call dreams 2` ends it.
 
 ### Lite edition
 

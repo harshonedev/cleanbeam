@@ -1,12 +1,17 @@
 package com.cleanyourprojector.launcher.system
 
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.service.dreams.DreamService
 import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import com.cleanyourprojector.launcher.Prefs
 import com.cleanyourprojector.launcher.R
+import com.cleanyourprojector.launcher.graphics.Backdrop
+import com.cleanyourprojector.launcher.graphics.Wallpaper
+import java.util.concurrent.Executors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -23,12 +28,19 @@ class ClockDreamService : DreamService() {
     private var ampm: TextView? = null
     private var date: TextView? = null
     private var root: View? = null
+    private var bg: ImageView? = null
+    private var dim: View? = null
+
+    private val io = Executors.newSingleThreadExecutor()
+    private val backdrop = Backdrop()
+    private var pictureSlot = -1L              // period the folder was last listed for
 
     private var phase = 0.0
 
     private val tick = object : Runnable {
         override fun run() {
             render()
+            showPicture()
             handler.postDelayed(this, 1_000)
         }
     }
@@ -56,6 +68,13 @@ class ClockDreamService : DreamService() {
         clock = findViewById(R.id.dream_clock)
         ampm = findViewById(R.id.dream_ampm)
         date = findViewById(R.id.dream_date)
+        bg = findViewById(R.id.dream_bg)
+        dim = findViewById(R.id.dream_dim)
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        io.shutdownNow()
     }
 
     override fun onDreamingStarted() {
@@ -87,5 +106,45 @@ class ClockDreamService : DreamService() {
         date?.text = dateFmt.format(now)
     }
 
+    /** The user's pictures (files/wallpapers) in turn behind the clock; the folder is listed once per period. */
+    private fun showPicture() {
+        val now = System.currentTimeMillis()
+        val slot = now / PICTURE_MS
+        if (slot == pictureSlot) return
+        pictureSlot = slot
+        val path = Wallpaper.pick(Wallpaper.images(this).map { it.path }, now, PICTURE_MS)
+        val dm = resources.displayMetrics
+        when (val c = backdrop.change(path)) {
+            Backdrop.Change.None -> {}
+            Backdrop.Change.Clear -> fadeTo(null)
+            is Backdrop.Change.Load -> io.execute {
+                val bmp = Wallpaper.load(c.key, dm.widthPixels, dm.heightPixels)
+                handler.post { if (backdrop.isCurrent(c.key)) fadeTo(bmp) }
+            }
+        }
+    }
+
+    private fun fadeTo(bmp: Bitmap?) {
+        val bg = bg ?: return
+        val dim = dim ?: return
+        bg.animate().cancel()
+        if (bmp == null) {
+            bg.animate().alpha(0f).setDuration(600).withEndAction { bg.setImageDrawable(null) }.start()
+            dim.animate().alpha(0f).setDuration(600).start()
+            return
+        }
+        val swap = Runnable {
+            bg.setImageBitmap(bmp)
+            bg.animate().alpha(1f).setDuration(900).start()
+            dim.animate().alpha(prefs.wallpaperDim / 100f).setDuration(900).start()
+        }
+        if (bg.drawable == null) swap.run() else bg.animate().alpha(0f).setDuration(600).withEndAction(swap).start()
+    }
+
     private fun dp(v: Float): Float = v * resources.displayMetrics.density
+
+    companion object {
+        /** How long each of the user's pictures stays up. */
+        const val PICTURE_MS = 10 * 60 * 1000L
+    }
 }

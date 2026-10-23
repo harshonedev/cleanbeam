@@ -24,6 +24,14 @@ object Wallpaper {
         }?.sortedBy { it.name } ?: emptyList())
     }
 
+    /** The picture for this moment: [paths] in turn, one per [periodMs]; null when there are none. */
+    fun pick(paths: List<String>, nowMs: Long, periodMs: Long): String? {
+        if (paths.isEmpty()) return null
+        return paths[((nowMs / periodMs) % paths.size).toInt()]
+    }
+
+    const val HALF_HOUR_MS = 30 * 60 * 1000L
+
     /** Decode one image downsampled to roughly the screen size, 16-bit: half the memory of ARGB. */
     fun load(path: String, reqW: Int, reqH: Int): Bitmap? {
         return try {
