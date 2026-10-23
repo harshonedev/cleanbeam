@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">EGate Home Lite</string>
+    <string name="home_quick">Quick settings</string>
 </resources>
