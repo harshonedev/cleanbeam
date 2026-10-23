@@ -1,5 +1,9 @@
 # Bluetooth path: run with the phone's Wi-Fi off (adb shell svc wifi disable). The badge must say
 # Bluetooth, keys must still move the projector, and status pushes must still arrive.
+# Precondition: the projector screen must be ON. Its screen-off timeout is 5 min; once the screen
+# is off, screenOn() (PowerManager.isInteractive) is false and the status line reads "Screen off",
+# not "On Home", so the first assert fails. Wake it (press a key on the projector or send one from a
+# second device) before running, or run within 5 min of last use.
 appId: io.egate.remote_app
 ---
 - launchApp:
