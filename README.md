@@ -66,3 +66,5 @@ downloads, and no `INTERNET` permission at all. Its Home tab is a Favorites shel
 settings shelf (Wi-Fi, Bluetooth, Focus, Keystone, Brightness, Input source,
 Launcher); there is no Favorites tab, and the Apps and Settings tabs are the same as Full. The Ambient theme is Full-only.
 Both editions share one package name, so installing one over the other keeps every setting.
+Release APKs measured 2026-10-23: Full 1,571 KB, Lite 1,525 KB (dex 901 KB vs 860 KB); the
+saving is at runtime (no fetches, image cache, or per-app ambient art), not on disk.
