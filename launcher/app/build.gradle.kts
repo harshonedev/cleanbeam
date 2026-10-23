@@ -15,6 +15,14 @@ android {
         versionName = "1.0"
     }
 
+    // Two editions of the same launcher. Lite has no catalogue, no network and no Ambient theme;
+    // the code seam is the per-flavor `Edition` object under src/<flavor>/java.
+    flavorDimensions += "edition"
+    productFlavors {
+        create("full") { dimension = "edition"; isDefault = true }
+        create("lite") { dimension = "edition"; versionNameSuffix = "-lite" }
+    }
+
     buildTypes {
         release {
             // R8 shrinks and optimises the dex: less code to load and verify on a cold start,

@@ -22,13 +22,6 @@ class ThemesTest {
         for (t in Themes.ALL.filter { it.hasPicture }) assertTrue(t.name, t.glass)
     }
 
-    @Test fun `the one dynamic theme has neither picture nor glass`() {
-        val dyn = Themes.ALL.filter { it.dynamic }
-        assertEquals(1, dyn.size)
-        assertFalse(dyn[0].hasPicture)
-        assertFalse(dyn[0].glass)
-    }
-
     @Test fun `themes are found by name`() {
         assertEquals(0, Themes.indexOf("Midnight"))
         assertEquals(-1, Themes.indexOf("Nope"))

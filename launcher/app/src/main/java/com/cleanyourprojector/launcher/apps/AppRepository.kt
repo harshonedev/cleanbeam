@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.palette.graphics.Palette
+import com.cleanyourprojector.launcher.Edition
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
@@ -65,7 +66,7 @@ object AppRepository {
             packageName = pkg,
             icon = icon,
             banner = banner,
-            ambient = ambientArt(banner ?: icon),
+            ambient = if (Edition.AMBIENT) ambientArt(banner ?: icon) else null,
             color = dominantColor(banner ?: icon),
             category = cat
         )

@@ -1,6 +1,7 @@
 package com.cleanyourprojector.launcher.graphics
 
 import androidx.annotation.DrawableRes
+import com.cleanyourprojector.launcher.Edition
 import com.cleanyourprojector.launcher.R
 
 /**
@@ -35,7 +36,7 @@ object Themes {
         Theme("Graphite", 0xFF15171C.toInt(), 0, glass = true),
         Theme("Pure black", 0xFF000000.toInt(), 0, glass = false),
         Theme("My wallpaper", 0xFF070A14.toInt(), 0, glass = true, userWallpaper = true)
-    )
+    ).filter { Edition.AMBIENT || !it.dynamic }   // Lite has no moving theme
     const val DEFAULT = 0
     fun indexOf(name: String?): Int = ALL.indexOfFirst { it.name == name }
 }
