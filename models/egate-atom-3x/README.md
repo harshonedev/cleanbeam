@@ -8,7 +8,7 @@
 | Network ADB | port **3333** (5555 refuses) |
 | Status | Tested: debloat, Full and Lite launcher, phone remote, screensaver |
 
-![Before and after: the stock Jixin launcher, then Clean Beam](../../docs/images/before-after.jpg)
+![Before and after: the stock launcher, then Clean Beam](../../docs/images/before-after.jpg)
 
 ## Debloat
 
