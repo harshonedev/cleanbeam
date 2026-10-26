@@ -21,3 +21,5 @@ remote/phone/ios/Flutter/ephemeral/
 .superpowers/
 # macOS
 .DS_Store
+backups/
+scans/

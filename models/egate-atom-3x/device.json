@@ -1,0 +1,12 @@
+{
+  "name": "EGate Atom 3X",
+  "brand": "EGate",
+  "kind": "projector",
+  "android": "13",
+  "platform": "txhd2",
+  "model_prop": "t950s_be311",
+  "adb_port": 3333,
+  "home_property": "persist.jx.launcher.highpriority",
+  "tested": ["debloat", "launcher-full", "launcher-lite", "remote", "screensaver"],
+  "notes": "Jixin firmware. Seven packages off: Aptoide, two ad pushers, Jixin analytics/apppush/ota, ad screensaver. Projector controls, droidlogic input layer and eshare mirroring kept."
+}

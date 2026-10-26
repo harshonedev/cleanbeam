@@ -3,8 +3,7 @@
 #   tools/install-remote.sh [--build]
 set -euo pipefail
 cd "$(dirname "$0")/.."
-: "${ANDROID_SERIAL:=192.168.10.57:3333}"
-export ANDROID_SERIAL
+# ANDROID_SERIAL picks the projector when adb sees more than one device (e.g. 192.168.1.50:5555).
 if [[ "${1:-}" == "--build" ]]; then (cd remote/receiver && ./gradlew assembleDebug -q); fi
 APK=remote/receiver/app/build/outputs/apk/debug/app-debug.apk
 PKG=com.cleanbeam.remote

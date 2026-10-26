@@ -6,7 +6,7 @@
 # the box has 1 GB of RAM and decodes every picture itself.
 set -euo pipefail
 
-SERIAL="${PROJECTOR_SERIAL:-192.168.10.58:3333}"
+SERIAL="${PROJECTOR_SERIAL:-${ANDROID_SERIAL:-}}"   # empty: the only device adb sees
 CLEAR=0
 while getopts "s:c" opt; do
   case $opt in
@@ -18,13 +18,19 @@ done
 shift $((OPTIND - 1))
 [ $# -ge 1 ] || { echo "usage: $0 [-s SERIAL] [-c] picture..." >&2; exit 2; }
 
+ADB() { if [ -n "$SERIAL" ]; then adb -s "$SERIAL" "$@"; else adb "$@"; fi; }
+
 DIR=/sdcard/Android/data/com.cleanbeam.launcher/files/wallpapers
-adb -s "$SERIAL" shell mkdir -p "$DIR"
-[ $CLEAR = 1 ] && adb -s "$SERIAL" shell "rm -f $DIR/*"
+ADB shell mkdir -p "$DIR"
+[ $CLEAR = 1 ] && ADB shell "rm -f $DIR/*"
 for f in "$@"; do
   case "${f##*.}" in
-    jpg|jpeg|png|webp|JPG|JPEG|PNG|WEBP) adb -s "$SERIAL" push "$f" "$DIR/" ;;
+    jpg|jpeg|png|webp|JPG|JPEG|PNG|WEBP) ADB push "$f" "$DIR/" ;;
     *) echo "skip $f: not jpg/png/webp" >&2 ;;
   esac
 done
-adb -s "$SERIAL" shell ls -l "$DIR"
+# A folder that adb created (before the launcher ever ran) belongs to shell with mode 2770, and the
+# launcher cannot list it: "My wallpaper" then stays a flat colour. Let others read it, and keep the
+# setgid bit (plain 777 drops it, and the next adb push fails with "remote fchown failed").
+ADB shell "chmod 2775 $DIR; chmod a+r $DIR/*" || true
+ADB shell ls -l "$DIR"

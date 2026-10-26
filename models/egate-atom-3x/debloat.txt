@@ -1,0 +1,30 @@
+# EGate Atom 3X (Amlogic txhd2, board t950s_be311, reports itself as "Google t950s_be311"), Android 13.
+# Jixin firmware, 1920x1080 panel rendered at 1280x720.
+#
+# Apply:   tools/debloat.sh models/egate-atom-3x/debloat.txt
+# Undo:    tools/restore.sh
+# Everything is DISABLED (pm disable-user --user 0), never uninstalled. Comment out anything you use.
+# In use since 2026-10-23: all seven disabled, projector boots and runs normally across reboots.
+#
+# Kept on purpose (do NOT add these):
+# - com.jixin.service2, com.jixin.dispatcher, com.jixin.settings5, com.jixin.wifi: focus, keystone,
+#   input switching, the projector's own settings and Wi-Fi screens.
+# - com.droidlogic.* (keystone, tvinput, tv.settings, overlays): Amlogic picture and HDMI input layer.
+# - com.eshare.*: screen mirroring from a phone or laptop.
+# - com.jixin.factorytest: started by F7 on a keyboard; harmless when idle.
+# - com.jixin.launcher5: the stock launcher, kept as a fallback Home.
+
+# Third-party app store (Play Store already present)
+cm.aptoide.pt
+
+# Ad / content pushers
+com.community.newroom
+com.community.mbox.tv
+
+# Telemetry, remote app push, forced OTA (Jixin)
+com.jixin.analytics
+com.jixin.apppush
+com.jixin.ota
+
+# Ad screensaver that re-points the screensaver setting to itself at every boot
+com.jixin.screensaver
