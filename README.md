@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Your projector, minus the junk.</b><br>
-  Debloat any Android projector over Wi-Fi, replace its home screen with a clean launcher,
+  Debloat an Android projector over Wi-Fi, replace its home screen with a clean launcher,
   and control it from your phone. No root, nothing uninstalled, one-line restore.
 </p>
 
@@ -34,26 +34,30 @@ Mac, Linux or Windows computer on the same Wi-Fi:
 | **Phone remote** | Control the projector from your phone over Wi-Fi or Bluetooth: D-pad, keyboard, touchpad, apps, focus and keystone. |
 
 Clean Beam is **projector-first**. It knows about focus, keystone, projection mode and vendor input
-screens, and each projector gets its own tested list. Android TVs and TV boxes work too, as a
-bonus: the launcher, the catalogue and the remote don't care what kind of screen they're on.
+screens, and each projector gets its own tested list. The launcher and the catalogue also run on
+Android TVs and TV boxes. The phone remote only works where network ADB skips the authorisation
+handshake (`ro.adb.secure` is `0` or empty). Certified Google TV devices usually ask for that
+handshake, so the remote cannot press keys there.
 
 > Clean Beam is heavily inspired by [cleanyourtv](https://github.com/Gathin23/cleanyourtv), which does
 > the same for Android TVs. If you have a TV rather than a projector, start there.
 
 ## Quick start
 
-You need a computer on the same Wi-Fi as the projector, and about 20 minutes.
-**Signed APKs** for the launcher, the receiver and the phone app are on
-[Releases](https://github.com/harshonedev/cleanbeam/releases/latest), so you don't need to build anything.
+You need a computer on the same Wi-Fi as the projector, `adb`, `git`, and about 20 minutes.
+The launcher needs **Android 9 or newer**.
+**Signed APKs** for the launcher (Full and Lite, version 0.1.0), the receiver and the Android phone
+app are on [Releases](https://github.com/harshonedev/cleanbeam/releases/latest), so you don't need
+to build anything.
 
 | | Where | What to do |
 |---|---|---|
 | **1** | **Projector** | Settings → Device Preferences → About → press OK on **Build** 7 times. Back → Developer options → turn on **USB debugging** (and **Network / ADB debugging** if it's there). |
 | **2** | **Computer** | Install `adb` and `git` ([Mac, Linux, Windows guide](docs/guides/01-prepare-your-computer.md)), then `git clone https://github.com/harshonedev/cleanbeam && cd cleanbeam` |
-| **3** | **Connect** | `adb connect <projector-ip>:5555`. Many projectors use **3333** instead. Accept "Allow USB debugging?" on the projector. ([Help](docs/guides/02-connect-your-projector.md)) |
-| **4** | **Debloat** | `tools/scan.sh` to see what's installed, then `tools/debloat.sh models/<your-model>/debloat.txt`. ([Guide](docs/guides/03-debloat.md)) |
+| **3** | **Connect** | `adb connect <projector-ip>:5555`. The EGate Atom 3X, and many others, use **3333** instead. Accept "Allow USB debugging?" on the projector. `adb devices` should list it as `device`. ([Help](docs/guides/02-connect-your-projector.md)) |
+| **4** | **Debloat** | On the Atom 3X: `DRY_RUN=1 tools/debloat.sh models/egate-atom-3x/debloat.txt` prints what it would turn off and changes nothing. Drop `DRY_RUN=1` to apply it. You should see `backup: backups/...`, then `OK`, `SKIP` or `WARN` for each package. Another projector: `tools/scan.sh` writes a report to `scans/` and changes nothing — build a list from the [debloat guide](docs/guides/03-debloat.md) before disabling anything. |
 | **5** | **Launcher** | Install the launcher and make it Home. ([Guide](docs/guides/04-launcher.md)) |
-| **6** | **Remote** | Install the receiver on the projector and the app on your phone, then pair with the 6-digit code. ([Guide](docs/guides/05-phone-remote.md)) |
+| **6** | **Remote** | Install the receiver on the projector and the app on your Android phone, then pair with the 6-digit code. ([Guide](docs/guides/05-phone-remote.md)) |
 
 Would you rather have an AI coding assistant (Claude Code, Codex, Gemini CLI) do it, checking each
 step with screenshots from the projector? Open this folder in it and paste a prompt from
@@ -65,20 +69,22 @@ Changed your mind? `tools/restore.sh` puts everything back ([guide](docs/guides/
 
 ### A launcher built for a projector
 
-Four tabs (**Home**, **Apps**, **Favorites**, **Settings**) driven entirely by the D-pad. A big
-title names whatever has focus, the clock and Wi-Fi sit top right, and the font is
-[Outfit](https://fonts.google.com/specimen/Outfit).
+The Full edition has four tabs (**Home**, **Apps**, **Favorites**, **Settings**). Lite has three
+(**Home**, **Apps**, **Settings**): favourites sit on Home, and there is no Favorites tab. Either
+way the D-pad drives everything. A big title names whatever has focus, the clock and Wi-Fi sit
+top right, and the font is [Outfit](https://fonts.google.com/specimen/Outfit).
 
 | | |
 |---|---|
 | ![Apps tab: every installed app as a large card](docs/images/launcher-apps.jpg) | ![Settings tab: phone remote, Wi-Fi, Bluetooth, focus, keystone and more](docs/images/launcher-settings.jpg) |
 | *Apps: every installed app, big enough to read from the sofa* | *Settings: phone remote, Wi-Fi, Bluetooth, Focus, Keystone, Brightness, Projection, Input source* |
 
-### Eight themes
+### Themes
 
-Pick one from **Settings → Launcher → Theme**. It applies instantly behind the menu, so the list
-doubles as a preview. Ambient is the only theme that moves: the focused title's artwork washes over
-the room in its colour. **My wallpaper** shows your own pictures, a new one every half hour.
+Full has eight. Lite has the same list without **Ambient** (seven). Pick one from **Settings →
+Launcher → Theme**. It applies instantly behind the menu, so the list doubles as a preview.
+Ambient (Full only) is the only theme that moves: the focused title's artwork washes over the room
+in its colour. **My wallpaper** shows your own pictures, a new one every half hour.
 
 ![All eight themes: Midnight, Ambient, Aurora, Nebula, Ruska, Graphite, Pure black, My wallpaper](docs/images/themes-grid.jpg)
 
@@ -96,15 +102,18 @@ opens it **directly in its app** when a deep link exists, or that app's search o
 
 The catalogue needs a free TMDB access token of your own: paste it in **Settings → Launcher → TMDB
 access token**, or push it from your computer ([how](docs/guides/04-launcher.md#the-streaming-catalogue)).
-Without one, the launcher works fine and simply leaves the catalogue out.
+Without one, the launcher works fine and simply leaves the catalogue out. The services it knows are
+listed in
+[`Services.kt`](launcher/app/src/full/java/com/cleanbeam/launcher/catalog/Services.kt).
+YouTube is left out on purpose: its catalogue is uploads, not film and series releases.
 
 ### A Lite edition for weak projectors
 
 `lite` is the same launcher without the catalogue: no TMDB, no image downloads, and no `INTERNET`
 permission at all. Its Home tab is your favourite apps plus a **Quick settings** row (Wi-Fi,
-Bluetooth, Focus, Keystone, Brightness, Input source). It's ideal for 1 GB boxes, or if you just
-want a clean app launcher. Both editions share one package name, so you can switch without losing
-settings.
+Bluetooth, Focus, Keystone, Brightness, Input source, Launcher). It's ideal for 1 GB boxes, or if
+you just want a clean app launcher. Both editions use the package `com.cleanbeam.launcher`, so
+installing one over the other keeps your theme, favourites and settings.
 
 | | |
 |---|---|
@@ -122,11 +131,12 @@ screensavers many projectors ship with.
 
 <img src="docs/images/remote-icon.png" alt="Clean Beam Remote app icon" width="96" align="right">
 
-Lost the IR remote, or tired of typing passwords with a D-pad? **Clean Beam Remote** is a phone app
-(Android now, iOS from the same code later) plus a small receiver on the projector.
+Lost the IR remote, or tired of typing passwords with a D-pad? **Clean Beam Remote** is an Android
+phone app plus a small receiver on the projector. The iOS project is the same Flutter code; it is
+not on Releases yet.
 
 - **Remote:** D-pad with press-and-hold, Back, Home, Menu, volume, media keys, power menu.
-- **Quick settings:** Input source, Wi-Fi, Bluetooth, Focus, Keystone, Brightness, Projection, projector settings, each shown only when the projector has it.
+- **Quick settings:** Input source, Wi-Fi, Bluetooth, Focus, Keystone, Brightness, Projection, projector settings, system settings. Each one shows up only when the projector has it.
 - **Type:** a live keyboard. Every key goes straight to the focused field, emoji and Hindi included, and you can paste from your phone.
 - **Apps:** every app on the projector with its icon. Tap to open, long-press to pin.
 - **Touchpad:** drag to move a mouse pointer, tap to click, two fingers to scroll.
@@ -144,12 +154,12 @@ Pair once by scanning the QR code on the projector or typing its 6-digit code:
 |---|---|---|---|---|---|---|
 | EGate Atom 3X | 13 | 3333 | ✅ tested | ✅ Full + Lite | ✅ Wi-Fi + BLE | [`models/egate-atom-3x`](models/egate-atom-3x/) |
 
-**Your projector isn't listed?** It will very likely still work. The launcher needs Android 9 or
-newer, and the remote needs a projector whose network ADB doesn't ask for authorisation, which is
-how most uncertified Android projectors ship. Run `tools/scan.sh`, build a list with the
-[debloat guide](docs/guides/03-debloat.md) (or the "new projector" prompt in
-[`PROMPTS.md`](PROMPTS.md)), and send it as a pull request ([`CONTRIBUTING.md`](CONTRIBUTING.md)).
-Every list in `models/` came from someone's real projector.
+**Your projector isn't listed?** The launcher still installs on Android 9 or newer. The remote
+still needs network ADB that skips authorisation, which is how most uncertified Android projectors
+ship. Run `tools/scan.sh`, build a list with the [debloat guide](docs/guides/03-debloat.md) (or the
+"new projector" prompt in [`PROMPTS.md`](PROMPTS.md)), and send it as a pull request
+([`CONTRIBUTING.md`](CONTRIBUTING.md)). Every list in `models/` came from someone's real projector.
+Only list packages you actually tried, and mark guesses with `# untested:`.
 
 [cleanyourtv's `examples/`](https://github.com/Gathin23/cleanyourtv/tree/main/examples) has tested
 lists for several projectors we don't have yet (Magcubic HY300 Pro, HY320, Wanbo X5 Pro, XGIMI,
@@ -183,6 +193,14 @@ Developer notes for the launcher's source layout and the remote's wire protocol 
 [`docs/guides/04-launcher.md`](docs/guides/04-launcher.md#building-from-source) and
 [`remote/README.md`](remote/README.md).
 
+## Limits
+
+- **One projector is tested end to end.** Debloat, both launcher editions and the phone remote were run on the EGate Atom 3X (Android 13, ADB on port 3333).
+- **The phone remote needs open network ADB.** It injects keys through the projector's own `adbd` on localhost. That works when `adb shell getprop ro.adb.secure` prints `0` or nothing. When it prints `1`, the receiver cannot press keys, type or open apps.
+- **Sleep cannot be undone from the phone.** On the boards this was tried on, sleep suspends Wi-Fi and Bluetooth. Wake the projector with the IR remote or the power button.
+- **The phone app is Android-only for now.** There is no iOS build on Releases.
+- **Lite stays offline.** No catalogue, no Ambient theme, no `INTERNET` permission, and no Favorites tab.
+
 ## Safety
 
 - **Nothing is uninstalled.** Every package is disabled for user 0 and comes back with `pm enable`.
@@ -199,3 +217,5 @@ Developer notes for the launcher's source layout and the remote's wire protocol 
 ## License
 
 [MIT](LICENSE).
+
+A bad result, a question, or a projector to add: open an [issue](https://github.com/harshonedev/cleanbeam/issues). A tested model folder is a pull request ([how](CONTRIBUTING.md)).
