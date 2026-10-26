@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Clean Beam's ring-and-square mark as the D-pad of a remote. The PNG mipmaps and the iOS
+     AppIcon set are rendered from the same 108-unit grid. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#222A4A"
+        android:pathData="M50,21h8a13,13 0 0,1 13,13v40a13,13 0 0,1 -13,13h-8a13,13 0 0,1 -13,-13v-40a13,13 0 0,1 13,-13z"/>
+    <path android:fillColor="#5B8CFF" android:fillType="evenOdd"
+        android:pathData="M54,43 m-13,0 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z M54,43 m-7,0 a7,7 0 1,1 14,0 a7,7 0 1,1 -14,0 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M51,40h6v6h-6z"/>
+    <path android:fillColor="#8FA8FF"
+        android:pathData="M43.5,66a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z M51.5,66a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z M59.5,66a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z M43.5,75a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z M51.5,75a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z M59.5,75a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0z"/>
+</vector>

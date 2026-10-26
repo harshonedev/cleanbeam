@@ -25,8 +25,8 @@ How it works on the projector:
 Smoke test from the Mac (token is in `/data/data/com.cleanbeam.remote/shared_prefs/pairing.xml`):
 
 ```bash
-node tools/wsctl.mjs 192.168.10.52 <token> '{"t":"key","code":20,"action":"tap"}' '{"t":"apps"}' '{"t":"status"}'
-node tools/wsctl.mjs 192.168.10.52 --pair <pin> '{"t":"ping"}'     # manual pairing path
+node tools/wsctl.mjs <projector-ip> <token> '{"t":"key","code":20,"action":"tap"}' '{"t":"apps"}' '{"t":"status"}'
+node tools/wsctl.mjs <projector-ip> --pair <pin> '{"t":"ping"}'     # manual pairing path
 ```
 
 Logs: `adb logcat -s CleanBeamRemote`.
@@ -54,7 +54,7 @@ The projector's IP moves with DHCP. The receiver reports its current IP in `auth
 maestro --device <phone serial> test maestro/remote_flow.yaml      # every control, status line, shortcuts, keyboard, apps, touchpad
 adb -s <phone> shell svc wifi disable && maestro --device <phone> test maestro/ble_flow.yaml
 adb -s <phone> shell svc wifi enable  && maestro --device <phone> test maestro/reconnect_flow.yaml
-maestro --device <phone> test -e PIN=123456 -e IP=192.168.10.56 maestro/pair_with_code.yaml   # app must be unpaired
+maestro --device <phone> test -e PIN=123456 -e IP=<projector-ip> maestro/pair_with_code.yaml   # app must be unpaired
 ```
 
 Buttons carry accessibility ids equal to their widget keys (`dpad-ok`, `btn-home`, `shortcut-input`, `app-<pkg>`, `type-enter`, …).
