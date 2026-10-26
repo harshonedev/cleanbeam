@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/themes/aurora.jpg" alt="Clean Beam launcher on a projector, Aurora theme: Home tab with favourite apps and a streaming catalogue row" width="820">
+  <img src="docs/images/before-after.jpg" alt="Before: the stock Jixin launcher on an EGate Atom 3X projector, a grid of coloured vendor tiles. After: the Clean Beam launcher, Aurora theme, with favourite apps and a streaming catalogue row" width="860">
 </p>
 
 <h1 align="center">Clean Beam</h1>
