@@ -9,15 +9,12 @@ set -euo pipefail
 LIST="${1:?usage: tools/debloat.sh <debloat list>  (e.g. models/egate-atom-3x/debloat.txt)}"
 [ -r "$LIST" ] || { echo "cannot read the list: $LIST" >&2; exit 1; }
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/tools/lib.sh"
 SH() { adb shell "$@" | tr -d '\r'; }
 
-# Windows editors save a BOM and CRLF line ends; strip both, then comments and blank lines.
-PKGS=$(LC_ALL=C awk 'NR==1{sub(/^\357\273\277/,"")} {sub(/\r$/,""); sub(/#.*/,""); if ($1!="") print $1}' "$LIST")
+PKGS="$(read_list "$LIST")"
 [ -n "$PKGS" ] || { echo "refusing $LIST: no package names in it (every line is a comment or blank)" >&2; exit 1; }
-
-# The name ends up in a shell command on the device, so take bare package names only.
-BAD=$(printf '%s\n' "$PKGS" | grep -vE '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$' || true)
-[ -z "$BAD" ] || { echo "refusing $LIST, not a package name:" >&2; printf '  %s\n' $BAD >&2; exit 1; }
+require_pkgs "$LIST" "$PKGS"
 
 # Core Android: with one of these off, the device may never boot again. Same rule as cleanyourtv's
 # tools/disable.sh (its issue #884: a Mi TV Stick bricked by a list that took the permission
