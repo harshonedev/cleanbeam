@@ -25,8 +25,10 @@ favourites and settings.
 
 ### From a release APK
 
+Download it from [Releases](https://github.com/harshonedev/cleanbeam/releases/latest), then:
+
 ```sh
-adb install -r cleanbeam-launcher-full.apk      # or cleanbeam-launcher-lite.apk
+adb install -r cleanbeam-launcher-full-0.1.0.apk      # or cleanbeam-launcher-lite-0.1.0.apk
 ```
 
 ### Building from source

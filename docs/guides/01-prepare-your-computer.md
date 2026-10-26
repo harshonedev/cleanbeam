@@ -89,10 +89,26 @@ Run every command in the guides from this folder.
 
 ## Prebuilt APKs or build yourself
 
-If the repo's **Releases** page has APKs, download `cleanbeam-launcher-full.apk` (or `-lite`),
-`cleanbeam-remote-receiver.apk` and `cleanbeam-remote-phone.apk`. You then only need `adb`.
+The [**Releases** page](https://github.com/harshonedev/cleanbeam/releases/latest) has signed APKs.
+With them, you only need `adb`:
 
-Otherwise build them. The guides show how; each one is a single Gradle command once JDK 17 is
+| File | Install on | What |
+|---|---|---|
+| `cleanbeam-launcher-full-<version>.apk` | projector | Launcher with the streaming catalogue |
+| `cleanbeam-launcher-lite-<version>.apk` | projector | Launcher without catalogue or internet (pick one of the two) |
+| `cleanbeam-remote-receiver-<version>.apk` | projector | Phone remote receiver |
+| `cleanbeam-remote-phone-<version>-arm64-v8a.apk` | phone | Phone remote app, for almost every phone from 2017 on |
+| `cleanbeam-remote-phone-<version>-armeabi-v7a.apk` | phone | For older 32-bit phones |
+| `cleanbeam-remote-phone-<version>-universal.apk` | phone | Works everywhere, three times the size |
+
+Check a download against `SHA256SUMS.txt` with `shasum -a 256 <file>` (or `certutil -hashfile <file>
+SHA256` on Windows).
+
+Every release is signed with the same Clean Beam key, so a newer APK installs over an older one and
+keeps your settings. If you built and installed the apps yourself first (debug key), uninstall them
+before installing a release, and vice versa.
+
+Or build them yourself. The guides show how; each one is a single Gradle command once JDK 17 is
 installed. The first build downloads Gradle and the Android SDK pieces it needs, so it takes a
 while.
 

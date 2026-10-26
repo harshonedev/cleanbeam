@@ -1,3 +1,7 @@
+import java.io.File
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,7 +16,7 @@ android {
         minSdk = 28
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1.0"
     }
 
     // Two editions of the same launcher. Lite has no catalogue, no network and no Ambient theme;
@@ -23,6 +27,22 @@ android {
         create("lite") { dimension = "edition"; versionNameSuffix = "-lite" }
     }
 
+    // Release signing comes from a properties file outside the repo (storeFile, storePassword,
+    // keyAlias, keyPassword): $CLEANBEAM_SIGNING, or ~/.cleanbeam/release-signing.properties.
+    // Without it a release build is signed with the debug key, so anyone can still build one.
+    val releaseSigning = File(System.getenv("CLEANBEAM_SIGNING")
+        ?: "${System.getProperty("user.home")}/.cleanbeam/release-signing.properties")
+    signingConfigs {
+        if (releaseSigning.isFile) create("release") {
+            val p = Properties()
+            FileInputStream(releaseSigning).use { stream -> p.load(stream) }
+            storeFile = file(p.getProperty("storeFile"))
+            storePassword = p.getProperty("storePassword")
+            keyAlias = p.getProperty("keyAlias")
+            keyPassword = p.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
             // R8 shrinks and optimises the dex: less code to load and verify on a cold start,
@@ -30,7 +50,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {

@@ -36,7 +36,7 @@ tools/install-remote.sh --build          # builds, installs, grants permissions,
 From a release APK:
 
 ```sh
-adb install -r cleanbeam-remote-receiver.apk
+adb install -r cleanbeam-remote-receiver-0.1.0.apk
 adb shell pm grant com.cleanbeam.remote android.permission.BLUETOOTH_CONNECT
 adb shell pm grant com.cleanbeam.remote android.permission.BLUETOOTH_ADVERTISE
 adb shell pm grant com.cleanbeam.remote android.permission.POST_NOTIFICATIONS
@@ -51,7 +51,8 @@ remote** in the Clean Beam launcher, or run the `am start` line above.
 
 ## 2. Install the app on your phone
 
-From a release: copy `cleanbeam-remote-phone.apk` to the phone and open it. Allow "install unknown
+From a [release](https://github.com/harshonedev/cleanbeam/releases/latest): download
+`cleanbeam-remote-phone-<version>-arm64-v8a.apk` on the phone (`armeabi-v7a` for old 32-bit phones) and open it. Allow "install unknown
 apps" for your file manager or browser when asked.
 
 From source (Flutter 3.41+, JDK 17), with the phone connected over USB and USB debugging on:

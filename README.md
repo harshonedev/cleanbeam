@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/harshonedev/cleanbeam/releases/latest">Download</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#what-you-get">What you get</a> ·
   <a href="#supported-projectors">Supported projectors</a> ·
@@ -42,6 +43,8 @@ bonus: the launcher, the catalogue and the remote don't care what kind of screen
 ## Quick start
 
 You need a computer on the same Wi-Fi as the projector, and about 20 minutes.
+**Signed APKs** for the launcher, the receiver and the phone app are on
+[Releases](https://github.com/harshonedev/cleanbeam/releases/latest), so you don't need to build anything.
 
 | | Where | What to do |
 |---|---|---|

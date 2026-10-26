@@ -49,6 +49,29 @@ licensed. If you start from one, keep a line in the header:
 - Match the style around you. Commit messages: `feat(launcher): ...`, `fix(remote): ...`,
   `docs: ...`, `models: add wanbo-x5-pro`.
 
+## Release signing (maintainers)
+
+Release builds of all three apps are signed with one Clean Beam key. Its path and passwords are
+read from a properties file **outside the repo**, either `$CLEANBEAM_SIGNING` or
+`~/.cleanbeam/release-signing.properties`:
+
+```
+storeFile=/absolute/path/cleanbeam-release.jks
+storePassword=...
+keyAlias=cleanbeam
+keyPassword=...
+```
+
+Without that file, `assembleRelease` signs with the local debug key, so anyone can build and test a
+release build. Those APKs just won't install over official releases. Never commit the keystore or
+the properties file.
+
+To cut a release: bump `versionCode`/`versionName` in `launcher/app/build.gradle.kts` and
+`remote/receiver/app/build.gradle.kts` and `version:` in `remote/phone/pubspec.yaml`, then run
+`:app:assembleFullRelease :app:assembleLiteRelease` in `launcher/`, `assembleRelease` in
+`remote/receiver/`, and `assembleRelease` (plus `-Psplit-per-abi=true`) in `remote/phone/android/`.
+Attach the APKs and a `SHA256SUMS.txt` to a GitHub release tagged `v<version>`.
+
 ## Screenshots
 
 Take them from the device (`adb exec-out screencap -p > shot.png`), crop nothing important, blur

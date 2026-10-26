@@ -23,3 +23,9 @@ remote/phone/ios/Flutter/ephemeral/
 .DS_Store
 backups/
 scans/
+
+# Release signing (keep outside the repo)
+*.jks
+*.keystore
+release-signing.properties
+key.properties
