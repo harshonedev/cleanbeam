@@ -181,7 +181,7 @@ re-asserts its clock whenever you return Home.
 
 ## Keep Wi-Fi awake in standby
 
-On by default. It holds a Wi-Fi lock so the phone remote and ADB stay reachable while the picture is
+Off by default: turn it on in Launcher settings if you use the phone remote. It holds a Wi-Fi lock so the phone remote and ADB stay reachable while the picture is
 off. It doesn't help when the projector truly sleeps (suspends): on most boards that turns Wi-Fi
 off, and only the IR remote or the power button wakes it.
 

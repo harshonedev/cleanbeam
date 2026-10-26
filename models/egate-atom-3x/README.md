@@ -26,7 +26,10 @@ adb shell setprop persist.jx.launcher.highpriority com.cleanbeam.launcher
 ```
 
 The property survives a reboot. `adb install -r` of the launcher can reset Home to the stock
-launcher: run both lines again after a reinstall.
+launcher: run both lines again after a reinstall. After an *uninstall* (switching between a
+self-built and a release APK), the stock launcher runs as Home in the meantime and rewrites the
+property a few seconds later. Set both lines **after** the new launcher is installed and on screen,
+then check with `adb shell getprop persist.jx.launcher.highpriority`.
 
 Back to stock: `adb shell setprop persist.jx.launcher.highpriority com.jixin.launcher5`.
 
