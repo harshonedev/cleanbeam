@@ -4,7 +4,7 @@
 # is off, screenOn() (PowerManager.isInteractive) is false and the status line reads "Screen off",
 # not "On Home", so the first assert fails. Wake it (press a key on the projector or send one from a
 # second device) before running, or run within 5 min of last use.
-appId: com.cleanyourprojector.phone
+appId: com.cleanbeam.phone
 ---
 - launchApp:
     stopApp: true

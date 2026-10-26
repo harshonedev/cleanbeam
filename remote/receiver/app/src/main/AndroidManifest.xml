@@ -5,9 +5,9 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
-    <!-- Status IPC with the EGate launcher: only apps signed with our key may send or receive it. -->
-    <permission android:name="com.cleanyourprojector.remote.permission.STATUS" android:protectionLevel="signature" />
-    <uses-permission android:name="com.cleanyourprojector.remote.permission.STATUS" />
+    <!-- Status IPC with the launcher: only apps signed with our key may send or receive it. -->
+    <permission android:name="com.cleanbeam.remote.permission.STATUS" android:protectionLevel="signature" />
+    <uses-permission android:name="com.cleanbeam.remote.permission.STATUS" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -28,7 +28,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.EGateRemote">
+        android:theme="@style/Theme.CleanBeamRemote">
 
         <activity
             android:name=".PairingActivity"
@@ -52,9 +52,9 @@
         <receiver
             android:name=".StatusQueryReceiver"
             android:exported="true"
-            android:permission="com.cleanyourprojector.remote.permission.STATUS">
+            android:permission="com.cleanbeam.remote.permission.STATUS">
             <intent-filter>
-                <action android:name="com.cleanyourprojector.remote.QUERY_STATUS" />
+                <action android:name="com.cleanbeam.remote.QUERY_STATUS" />
             </intent-filter>
         </receiver>
 

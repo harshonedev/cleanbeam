@@ -30,7 +30,7 @@ Future<String?> findProjectorBle({Duration timeout = const Duration(seconds: 5)}
     await FlutterBluePlus.stopScan();
     return id;
   } catch (e) {
-    debugPrint('[egate] ble scan error: $e (adapter ${FlutterBluePlus.adapterStateNow})');
+    debugPrint('[remote] ble scan error: $e (adapter ${FlutterBluePlus.adapterStateNow})');
     return null;
   }
 }

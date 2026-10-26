@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.cleanyourprojector.remote"
+    namespace = "com.cleanbeam.remote"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.cleanyourprojector.remote"
+        applicationId = "com.cleanbeam.remote"
         minSdk = 28
         targetSdk = 34
         versionCode = 1

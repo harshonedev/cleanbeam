@@ -15,17 +15,17 @@ import 'ui/theme.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  runApp(const EGateRemoteApp());
+  runApp(const CleanBeamRemoteApp());
 }
 
-class EGateRemoteApp extends StatefulWidget {
-  const EGateRemoteApp({super.key});
+class CleanBeamRemoteApp extends StatefulWidget {
+  const CleanBeamRemoteApp({super.key});
 
   @override
-  State<EGateRemoteApp> createState() => _EGateRemoteAppState();
+  State<CleanBeamRemoteApp> createState() => _CleanBeamRemoteAppState();
 }
 
-class _EGateRemoteAppState extends State<EGateRemoteApp> {
+class _CleanBeamRemoteAppState extends State<CleanBeamRemoteApp> {
   final _store = PairingStore();
   Pairing? _pairing;
   bool _loaded = false;
@@ -57,7 +57,7 @@ class _EGateRemoteAppState extends State<EGateRemoteApp> {
       );
 
   Future<void> _onPaired(Pairing p) async {
-    debugPrint('[egate] paired with ${p.name} at ${p.ip}:${p.port}');
+    debugPrint('[remote] paired with ${p.name} at ${p.ip}:${p.port}');
     await _store.save(p);
     setState(() {
       _pairing = p;
@@ -77,7 +77,7 @@ class _EGateRemoteAppState extends State<EGateRemoteApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'EGate Remote',
+      title: 'Clean Beam Remote',
       theme: buildTheme(),
       debugShowCheckedModeBanner: false,
       home: !_loaded

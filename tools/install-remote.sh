@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build (optional), install and start the EGate Remote receiver on the projector.
+# Build (optional), install and start the Clean Beam Remote receiver on the projector.
 #   tools/install-remote.sh [--build]
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 export ANDROID_SERIAL
 if [[ "${1:-}" == "--build" ]]; then (cd remote/receiver && ./gradlew assembleDebug -q); fi
 APK=remote/receiver/app/build/outputs/apk/debug/app-debug.apk
-PKG=com.cleanyourprojector.remote
+PKG=com.cleanbeam.remote
 adb install -r "$APK"
 adb shell pm grant $PKG android.permission.BLUETOOTH_CONNECT || true
 adb shell pm grant $PKG android.permission.BLUETOOTH_ADVERTISE || true

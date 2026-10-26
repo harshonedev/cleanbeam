@@ -1,4 +1,4 @@
-# EGate launcher: Outfit font, static themes, side panel — Design
+# Projector launcher: Outfit font, static themes, side panel — Design
 
 **Date:** 2026-10-23
 **Scope:** `launcher/` only. Visual refresh plus removal of technical text. No change to app loading, TMDB shelves, deep links or the remote link.

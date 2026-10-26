@@ -1,7 +1,7 @@
-# EGate
+# Clean Beam
 
-Software for the EGate projector: a custom Android TV home screen, a phone remote, and the
-device-side tooling that goes with them.
+A home screen and a phone remote for Android projectors: the launcher, the phone app, and the
+receiver that runs on the projector.
 
 ## Layout
 
@@ -17,7 +17,7 @@ docs/       Design specs and implementation plans.
 
 ## Launcher source layout
 
-`launcher/app/src/main/java/com/cleanyourprojector/launcher/`
+`launcher/app/src/main/java/com/cleanbeam/launcher/`
 
 | Package     | What lives there |
 |-------------|------------------|
@@ -37,12 +37,12 @@ Unit tests mirror the package under `launcher/app/src/test/`.
 ```sh
 cd launcher
 ./gradlew :app:assembleFullDebug :app:assembleLiteDebug :app:testFullDebugUnitTest :app:testLiteDebugUnitTest
-adb connect <projector-ip>:3333
+adb connect <projector-ip>:5555          # or :3333, the other port these boxes commonly use
 adb install -r app/build/outputs/apk/full/debug/app-full-debug.apk    # or lite/debug/app-lite-debug.apk
 ```
 
 The Full edition's Home tab needs a TMDB token: either paste it in Settings, or push it to
-`/sdcard/Android/data/com.cleanyourprojector.launcher/files/tmdb.key`.
+`/sdcard/Android/data/com.cleanbeam.launcher/files/tmdb.key`.
 
 ### Your own wallpapers
 
@@ -54,7 +54,7 @@ dimmed by the theme's "Picture dim" setting. Copy them over with
 tools/push-wallpapers.sh [-c] ~/Pictures/some.jpg ...     # -c empties the folder first
 ```
 
-which lands in `/sdcard/Android/data/com.cleanyourprojector.launcher/files/wallpapers/`.
+which lands in `/sdcard/Android/data/com.cleanbeam.launcher/files/wallpapers/`.
 jpg/png/webp, best at 1920x1080: the box has 1 GB of RAM and decodes each one itself.
 To preview the screensaver without waiting: `adb shell service call dreams 1` starts it and
 `service call dreams 2` ends it.

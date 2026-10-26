@@ -30,6 +30,7 @@ class WsTransport implements Transport {
 
   /// Set after a successful `pair` handshake.
   String? pairedToken;
+  String? pairedName;
 
   @override
   String? projectorIp;
@@ -81,6 +82,7 @@ class WsTransport implements Transport {
             authDone.complete();
           case PairOk(:final token, :final name):
             pairedToken = token;
+            pairedName = name;
             _onAuthenticated();
             authDone.complete();
             _events.add(AuthOk(name, ''));

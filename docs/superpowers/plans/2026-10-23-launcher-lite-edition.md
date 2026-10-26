@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Same `applicationId` (`com.cleanyourprojector.launcher`) for both flavors; Lite differs only by label `EGate Home Lite` and `versionNameSuffix "-lite"`.
+- Same `applicationId` (`com.cleanbeam.launcher`) for both flavors; Lite differs only by label `Clean Beam Home Lite` and `versionNameSuffix "-lite"`.
 - Lite APK declares no `android.permission.INTERNET`.
 - Full's behaviour is unchanged: same start tab rule, same shelves, skeletons, focus landing, hero, settings rows.
 - Lite themes, in order: Midnight, Aurora, Nebula, Ruska, Graphite, Pure black, My wallpaper. `Themes.DEFAULT` stays 0.
@@ -64,18 +64,18 @@ git commit -m "docs(launcher): lite edition design and plan"
 
 **Files:**
 - Modify: `launcher/app/build.gradle.kts` (inside `android {}`)
-- Create: `launcher/app/src/full/java/com/cleanyourprojector/launcher/Edition.kt`
-- Create: `launcher/app/src/lite/java/com/cleanyourprojector/launcher/Edition.kt`
+- Create: `launcher/app/src/full/java/com/cleanbeam/launcher/Edition.kt`
+- Create: `launcher/app/src/lite/java/com/cleanbeam/launcher/Edition.kt`
 - Create: `launcher/app/src/lite/AndroidManifest.xml`
 - Create: `launcher/app/src/lite/res/values/strings.xml`
-- Modify: `launcher/app/src/main/java/com/cleanyourprojector/launcher/graphics/Themes.kt:28-37`
-- Modify: `launcher/app/src/main/java/com/cleanyourprojector/launcher/apps/AppRepository.kt:62`
-- Modify: `launcher/app/src/test/java/com/cleanyourprojector/launcher/graphics/ThemesTest.kt` (remove the dynamic-theme test)
-- Create: `launcher/app/src/testFull/java/com/cleanyourprojector/launcher/EditionTest.kt`
-- Create: `launcher/app/src/testLite/java/com/cleanyourprojector/launcher/EditionTest.kt`
+- Modify: `launcher/app/src/main/java/com/cleanbeam/launcher/graphics/Themes.kt:28-37`
+- Modify: `launcher/app/src/main/java/com/cleanbeam/launcher/apps/AppRepository.kt:62`
+- Modify: `launcher/app/src/test/java/com/cleanbeam/launcher/graphics/ThemesTest.kt` (remove the dynamic-theme test)
+- Create: `launcher/app/src/testFull/java/com/cleanbeam/launcher/EditionTest.kt`
+- Create: `launcher/app/src/testLite/java/com/cleanbeam/launcher/EditionTest.kt`
 
 **Interfaces:**
-- Produces: `object Edition { const val NAME: String; const val AMBIENT: Boolean }` in package `com.cleanyourprojector.launcher`, one per flavor (`"full"`/`true`, `"lite"`/`false`). Task 3 adds `fun home(host: HomeHost): HomeTab` to both.
+- Produces: `object Edition { const val NAME: String; const val AMBIENT: Boolean }` in package `com.cleanbeam.launcher`, one per flavor (`"full"`/`true`, `"lite"`/`false`). Task 3 adds `fun home(host: HomeHost): HomeTab` to both.
 - Produces: `Themes.ALL` filtered by `Edition.AMBIENT || !it.dynamic`.
 
 - [ ] **Step 1: Write the failing flavor tests**
@@ -136,7 +136,7 @@ Full: `NAME = "full"`, `AMBIENT = true`. Lite: `NAME = "lite"`, `AMBIENT = false
     <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
 </manifest>
 ```
-`src/lite/res/values/strings.xml`: `app_name` = `EGate Home Lite`.
+`src/lite/res/values/strings.xml`: `app_name` = `Clean Beam Home Lite`.
 
 - [ ] **Step 6: Filter the theme list and skip ambient art**
 
@@ -168,12 +168,12 @@ git commit -m "build(launcher): full and lite product flavors; lite drops Ambien
 Behaviour-preserving extraction. Every method named below is today's code in `LauncherActivity` moved as-is, with `this`/fields replaced by `host` calls.
 
 **Files:**
-- Create: `launcher/app/src/main/java/com/cleanyourprojector/launcher/home/HomeTab.kt` (`HomeHost` + `HomeTab`)
-- Create: `launcher/app/src/full/java/com/cleanyourprojector/launcher/home/CatalogHome.kt`
-- Create: `launcher/app/src/lite/java/com/cleanyourprojector/launcher/home/LiteHome.kt` (stub; Task 4 fills it)
+- Create: `launcher/app/src/main/java/com/cleanbeam/launcher/home/HomeTab.kt` (`HomeHost` + `HomeTab`)
+- Create: `launcher/app/src/full/java/com/cleanbeam/launcher/home/CatalogHome.kt`
+- Create: `launcher/app/src/lite/java/com/cleanbeam/launcher/home/LiteHome.kt` (stub; Task 4 fills it)
 - Modify: both `Edition.kt` — add `fun home(host: HomeHost): HomeTab`
-- Modify: `launcher/app/src/main/java/com/cleanyourprojector/launcher/LauncherActivity.kt`
-- Move (git mv) to `src/full/java/com/cleanyourprojector/launcher/…`: `catalog/*.kt`, `graphics/ImageLoader.kt`, `ui/HomeRowsAdapter.kt`, `ui/TitleAdapter.kt`, `ui/SkeletonAdapter.kt`
+- Modify: `launcher/app/src/main/java/com/cleanbeam/launcher/LauncherActivity.kt`
+- Move (git mv) to `src/full/java/com/cleanbeam/launcher/…`: `catalog/*.kt`, `graphics/ImageLoader.kt`, `ui/HomeRowsAdapter.kt`, `ui/TitleAdapter.kt`, `ui/SkeletonAdapter.kt`
 - Move to `src/full/res/layout/`: `item_title.xml`, `item_skeleton.xml`
 - Create: `src/full/res/values/strings.xml` with `home_loading`, `home_no_token`, `home_no_token_hint`, `home_empty`, `home_empty_hint` (cut from `src/main/res/values/strings.xml`)
 - Move: `src/test/java/.../catalog/*.kt` → `src/testFull/java/.../catalog/`
@@ -181,7 +181,7 @@ Behaviour-preserving extraction. Every method named below is today's code in `La
 **Interfaces:**
 - Produces, in `main`:
 ```kotlin
-package com.cleanyourprojector.launcher.home
+package com.cleanbeam.launcher.home
 
 /** What the activity lends the Home tab. The activity implements it; the edition's HomeTab uses it. */
 interface HomeHost {
@@ -275,16 +275,16 @@ git commit -m "refactor(launcher): Home tab behind a per-edition HomeTab; catalo
 ### Task 4: Lite Home shelves (Favorites + Quick settings)
 
 **Files:**
-- Create: `launcher/app/src/lite/java/com/cleanyourprojector/launcher/home/LiteRows.kt`
-- Create: `launcher/app/src/lite/java/com/cleanyourprojector/launcher/ui/LiteHomeAdapter.kt`
-- Modify: `launcher/app/src/lite/java/com/cleanyourprojector/launcher/home/LiteHome.kt`
+- Create: `launcher/app/src/lite/java/com/cleanbeam/launcher/home/LiteRows.kt`
+- Create: `launcher/app/src/lite/java/com/cleanbeam/launcher/ui/LiteHomeAdapter.kt`
+- Modify: `launcher/app/src/lite/java/com/cleanbeam/launcher/home/LiteHome.kt`
 - Create: `launcher/app/src/lite/res/values/strings.xml` — add `home_quick` = `Quick settings`
-- Test: `launcher/app/src/testLite/java/com/cleanyourprojector/launcher/home/LiteRowsTest.kt`
+- Test: `launcher/app/src/testLite/java/com/cleanbeam/launcher/home/LiteRowsTest.kt`
 
 **Interfaces:**
 - Produces:
 ```kotlin
-package com.cleanyourprojector.launcher.home
+package com.cleanbeam.launcher.home
 data class LiteRow(val header: String, val apps: List<AppInfo> = emptyList(), val tiles: List<Tile> = emptyList())
 object LiteRows {
     val QUICK: List<String>   // "Wi-Fi", "Bluetooth", "Focus", "Keystone", "Brightness", "Input source", "Launcher"
@@ -293,7 +293,7 @@ object LiteRows {
 }
 ```
 ```kotlin
-package com.cleanyourprojector.launcher.ui
+package com.cleanbeam.launcher.ui
 class LiteHomeAdapter(onAppClick: (AppInfo) -> Unit, onAppLongClick: (AppInfo) -> Unit, onTileClick: (Tile) -> Unit)
     : RecyclerView.Adapter<LiteHomeAdapter.VH> {
     var upTarget: View?
@@ -359,11 +359,11 @@ git commit -m "feat(launcher): lite Home shows Favorites and Quick settings shel
 ### Task 5: Lite Home clock
 
 **Files:**
-- Create: `launcher/app/src/lite/java/com/cleanyourprojector/launcher/home/LiteClock.kt`
+- Create: `launcher/app/src/lite/java/com/cleanbeam/launcher/home/LiteClock.kt`
 - Create: `launcher/app/src/main/res/layout/home_clock.xml`
 - Modify: `launcher/app/src/main/res/layout/activity_launcher.xml` (a `ViewStub` after the hero)
-- Modify: `launcher/app/src/lite/java/com/cleanyourprojector/launcher/home/LiteHome.kt`
-- Test: `launcher/app/src/testLite/java/com/cleanyourprojector/launcher/home/LiteClockTest.kt`
+- Modify: `launcher/app/src/lite/java/com/cleanbeam/launcher/home/LiteHome.kt`
+- Test: `launcher/app/src/testLite/java/com/cleanbeam/launcher/home/LiteClockTest.kt`
 
 **Interfaces:**
 - Produces:
@@ -420,7 +420,7 @@ git commit -m "feat(launcher): large clock in the lite Home hero slot"
 ### Task 6: Ambient only in Full; README; on the box
 
 **Files:**
-- Modify: `launcher/app/src/main/java/com/cleanyourprojector/launcher/LauncherActivity.kt` (ambient sites)
+- Modify: `launcher/app/src/main/java/com/cleanbeam/launcher/LauncherActivity.kt` (ambient sites)
 - Modify: `README.md` (build/deploy section)
 
 - [ ] **Step 1: Gate the ambient machinery** — `private val ambient: Boolean get() = Edition.AMBIENT && prefs.theme.dynamic`; replace every `prefs.theme.dynamic` / `t.dynamic` read in the activity with `ambient` (`applyTheme`, `updateClock`, `renderAppHero`, `renderTileHero`, `showEmpty`, `paintRoom`). `tintDrawable` becomes `BitmapDrawable?`; the three `Layers` bakes in `onCreate` run inside `if (Edition.AMBIENT)`; `animateTint` returns when `tintDrawable == null`.
@@ -429,7 +429,7 @@ git commit -m "feat(launcher): large clock in the lite Home hero slot"
 
 - [ ] **Step 3: Build, test, permissions** — `./gradlew :app:testFullDebugUnitTest :app:testLiteDebugUnitTest :app:assembleFullDebug :app:assembleLiteDebug -q` → exit 0; the Task 2 Step 8 `aapt` check → `0` then `1`.
 
-- [ ] **Step 4: Lite on the box** — `export ANDROID_SERIAL=192.168.10.52:3333; adb install -r app/build/outputs/apk/lite/debug/app-lite-debug.apk; adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.HOME; sleep 6; adb exec-out screencap -p > …/scratchpad/lite-home.png`. Look at it: big clock top-left, no hero text, no small clock top-right, Favorites then Quick settings shelves. Then `adb shell input keyevent DPAD_DOWN DPAD_DOWN DPAD_RIGHT DPAD_RIGHT; adb shell input keyevent 3` (HOME) and a second screencap: shelves back at the top, first card focused. Then `adb shell dumpsys package com.cleanyourprojector.launcher | grep -c INTERNET` → `0`. Switch to Apps (`DPAD_UP`, `DPAD_RIGHT`, screencap): hero and status clock back.
+- [ ] **Step 4: Lite on the box** — `export ANDROID_SERIAL=192.168.10.52:3333; adb install -r app/build/outputs/apk/lite/debug/app-lite-debug.apk; adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.HOME; sleep 6; adb exec-out screencap -p > …/scratchpad/lite-home.png`. Look at it: big clock top-left, no hero text, no small clock top-right, Favorites then Quick settings shelves. Then `adb shell input keyevent DPAD_DOWN DPAD_DOWN DPAD_RIGHT DPAD_RIGHT; adb shell input keyevent 3` (HOME) and a second screencap: shelves back at the top, first card focused. Then `adb shell dumpsys package com.cleanbeam.launcher | grep -c INTERNET` → `0`. Switch to Apps (`DPAD_UP`, `DPAD_RIGHT`, screencap): hero and status clock back.
 
 - [ ] **Step 5: Commit**
 

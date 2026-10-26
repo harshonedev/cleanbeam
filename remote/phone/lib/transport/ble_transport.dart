@@ -23,6 +23,7 @@ class BleTransport implements Transport {
   bool _isConnected = false;
   Future<void> _writeQueue = Future.value();
   String? pairedToken;
+  String? pairedName;
 
   @override
   String? projectorIp;
@@ -59,6 +60,7 @@ class BleTransport implements Transport {
             authDone.complete();
           case PairOk(:final token, :final name):
             pairedToken = token;
+            pairedName = name;
             _isConnected = true;
             _connected.add(true);
             authDone.complete();

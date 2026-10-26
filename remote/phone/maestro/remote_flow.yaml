@@ -1,11 +1,11 @@
 # Every control once, by accessibility id. Assumes the phone is already paired and the projector is on.
 #   maestro --device <serial> test maestro/remote_flow.yaml
-appId: com.cleanyourprojector.phone
+appId: com.cleanbeam.phone
 ---
 - launchApp:
     stopApp: true
 - extendedWaitUntil:
-    visible: "EGate Atom3X"
+    visible: "Type"
     timeout: 15000
 - extendedWaitUntil:
     visible:

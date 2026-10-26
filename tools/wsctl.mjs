@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Smoke client for the EGate Remote WebSocket transport.
+// Smoke client for the Clean Beam Remote WebSocket transport.
 //   node tools/wsctl.mjs <ip> <token> '<json>' ['<json>' ...]
 //   node tools/wsctl.mjs <ip> --pair <pin> '<json>' ...
 const [,, ip, a, b, ...rest] = process.argv;

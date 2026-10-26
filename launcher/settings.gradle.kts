@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "EGateLauncher"
+rootProject.name = "CleanBeamLauncher"
 include(":app")

@@ -28,10 +28,10 @@ class FakeProjector {
         if (!authed) {
           if (m['t'] == 'auth' && m['token'] == token) {
             authed = true;
-            ws.add('{"t":"auth_ok","name":"EGate Atom3X","version":"1.0","ip":"192.168.10.57"}');
+            ws.add('{"t":"auth_ok","name":"Projector","version":"1.0","ip":"192.168.10.57"}');
           } else if (m['t'] == 'pair' && pin != null && m['code'] == pin) {
             authed = true;
-            ws.add('{"t":"pair_ok","token":"$token","name":"EGate Atom3X"}');
+            ws.add('{"t":"pair_ok","token":"$token","name":"Projector"}');
           } else {
             ws.add(m['t'] == 'pair' ? '{"t":"pair_fail"}' : '{"t":"auth_fail"}');
           }

@@ -102,7 +102,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     t.send(ping());
     _liveness = Timer(resumeProbe, () {
       if (_active == t) {
-        debugPrint('[egate] no answer after resume; dropping ${t.kind.name}');
+        debugPrint('[remote] no answer after resume; dropping ${t.kind.name}');
         _onDropped();
       }
     });
@@ -146,7 +146,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     Timer? graceTimer;
 
     void adopt(Transport t) {
-      debugPrint('[egate] connected over ${t.kind.name}');
+      debugPrint('[remote] connected over ${t.kind.name}');
       _attach(t);
       _attempt = 0;
       _connecting = false;
@@ -221,7 +221,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
           await t.close();
           return;
         }
-        debugPrint('[egate] wifi answered; leaving bluetooth');
+        debugPrint('[remote] wifi answered; leaving bluetooth');
         final old = _active;
         _attach(t);
         old?.close();
@@ -243,7 +243,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     }
     host ??= learnedIp;
     host ??= pairing.ip.isEmpty ? null : pairing.ip;
-    debugPrint('[egate] wifi: trying ${host ?? "(no host)"}');
+    debugPrint('[remote] wifi: trying ${host ?? "(no host)"}');
     if (host == null || gen != _generation) return null;
     final t = makeWs(host);
     try {
@@ -255,7 +255,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       _activeHost = host;
       return t;
     } catch (e) {
-      debugPrint('[egate] wifi failed: $e');
+      debugPrint('[remote] wifi failed: $e');
       _failed('wifi', e);
       await t.close();
       return null;
@@ -269,7 +269,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
     } catch (_) {
       id = null;
     }
-    debugPrint('[egate] ble: scan result ${id ?? "(none)"}');
+    debugPrint('[remote] ble: scan result ${id ?? "(none)"}');
     if (id == null || gen != _generation) return null;
     final t = makeBle(id);
     try {
@@ -280,7 +280,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
       }
       return t;
     } catch (e) {
-      debugPrint('[egate] ble failed: $e');
+      debugPrint('[remote] ble failed: $e');
       _failed('ble', e);
       await t.close();
       return null;
@@ -320,7 +320,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
 
   void _learnIp(String? ip) {
     if (ip == null || ip.isEmpty || ip == learnedIp) return;
-    debugPrint('[egate] projector ip is $ip');
+    debugPrint('[remote] projector ip is $ip');
     learnedIp = ip;
     onIpLearned?.call(ip);
     // A fresh address while on Bluetooth is the usual reason Wi-Fi just failed: try it right away.
@@ -341,7 +341,7 @@ class TransportManager extends ChangeNotifier implements CommandSink {
   }
 
   void _onDropped() {
-    debugPrint('[egate] connection lost');
+    debugPrint('[remote] connection lost');
     _detach();
     lastError = 'connection lost';
     notifyListeners();

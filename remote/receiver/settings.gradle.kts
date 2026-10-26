@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "EGateRemote"
+rootProject.name = "CleanBeamRemote"
 include(":app")

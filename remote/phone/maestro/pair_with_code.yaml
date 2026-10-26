@@ -1,6 +1,6 @@
 # Pair using the 6-digit PIN shown on the projector's "Remote pairing" screen (app must be unpaired).
 #   maestro --device <serial> test -e PIN=123456 -e IP=192.168.10.56 maestro/pair_with_code.yaml
-appId: com.cleanyourprojector.phone
+appId: com.cleanbeam.phone
 ---
 - launchApp:
     stopApp: true

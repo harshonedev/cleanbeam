@@ -18,7 +18,7 @@ done
 shift $((OPTIND - 1))
 [ $# -ge 1 ] || { echo "usage: $0 [-s SERIAL] [-c] picture..." >&2; exit 2; }
 
-DIR=/sdcard/Android/data/com.cleanyourprojector.launcher/files/wallpapers
+DIR=/sdcard/Android/data/com.cleanbeam.launcher/files/wallpapers
 adb -s "$SERIAL" shell mkdir -p "$DIR"
 [ $CLEAR = 1 ] && adb -s "$SERIAL" shell "rm -f $DIR/*"
 for f in "$@"; do

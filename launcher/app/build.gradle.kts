@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.cleanyourprojector.launcher"
+    namespace = "com.cleanbeam.launcher"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.cleanyourprojector.launcher"
+        applicationId = "com.cleanbeam.launcher"
         minSdk = 28
         targetSdk = 34
         versionCode = 1

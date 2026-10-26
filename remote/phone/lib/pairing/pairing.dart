@@ -23,7 +23,7 @@ class Pairing {
     final token = d['token']?.toString();
     if (token == null || token.isEmpty) return null;
     return Pairing(
-      name: d['name']?.toString() ?? 'EGate',
+      name: d['name']?.toString() ?? 'Projector',
       ip: d['ip']?.toString() ?? '',
       port: (d['port'] as num?)?.toInt() ?? 7272,
       token: token,
@@ -33,7 +33,7 @@ class Pairing {
   Map<String, dynamic> toJson() => {'name': name, 'ip': ip, 'port': port, 'token': token};
 
   factory Pairing.fromJson(Map<String, dynamic> j) => Pairing(
-        name: j['name'] as String? ?? 'EGate',
+        name: j['name'] as String? ?? 'Projector',
         ip: j['ip'] as String? ?? '',
         port: (j['port'] as num?)?.toInt() ?? 7272,
         token: j['token'] as String,

@@ -49,7 +49,7 @@ class ScriptedTransport implements Transport {
 }
 
 class Harness {
-  final pairing = Pairing(name: 'EGate Atom3X', ip: '192.168.10.52', port: 7272, token: 'TOKEN');
+  final pairing = Pairing(name: 'Projector', ip: '192.168.10.52', port: 7272, token: 'TOKEN');
   ScriptedTransport Function() makeWs;
   ScriptedTransport Function() makeBle;
   final ws = <ScriptedTransport>[];

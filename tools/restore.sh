@@ -25,4 +25,4 @@ SS_BEFORE="$(tr -d '[:space:]' < "$SNAP/screensaver-before.txt")"
 if [ -n "$SS_BEFORE" ] && [ "$SS_BEFORE" != "null" ]; then
   ADB shell settings put secure screensaver_components "$SS_BEFORE" && echo "screensaver -> $SS_BEFORE"
 fi
-echo "restore complete. (com.cleanyourprojector.launcher left installed; 'adb uninstall com.cleanyourprojector.launcher' to remove.)"
+echo "restore complete. (com.cleanbeam.launcher left installed; 'adb uninstall com.cleanbeam.launcher' to remove.)"

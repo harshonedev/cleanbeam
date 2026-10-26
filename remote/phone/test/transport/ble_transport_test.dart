@@ -39,7 +39,7 @@ class FakeGatt implements BleGatt {
     decoded.add(s);
     final m = jsonDecode(s) as Map;
     if (m['t'] == 'auth') {
-      reply(m['token'] == token ? '{"t":"auth_ok","name":"EGate Atom3X","version":"1.0","ip":"192.168.10.57"}' : '{"t":"auth_fail"}');
+      reply(m['token'] == token ? '{"t":"auth_ok","name":"Projector","version":"1.0","ip":"192.168.10.57"}' : '{"t":"auth_fail"}');
     } else if (m['t'] == 'apps') {
       final items = List.generate(40, (i) => '{"pkg":"com.example.app$i","label":"Application number $i"}').join(',');
       reply('{"t":"apps","items":[$items]}');

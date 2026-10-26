@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:nsd/nsd.dart' as nsd;
 
-const serviceType = '_egate-remote._tcp';
+const serviceType = '_cb-remote._tcp';
 
 /// Resolves the projector's current IP by Bonjour name; null when not found in time.
 Future<String?> resolveProjector(String name, {Duration timeout = const Duration(seconds: 2)}) async {

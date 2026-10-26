@@ -1,19 +1,19 @@
 <resources>
-    <style name="Theme.EGate" parent="Theme.AppCompat.NoActionBar">
+    <style name="Theme.Projector" parent="Theme.AppCompat.NoActionBar">
         <!-- Launch splash only: the activity paints its own background and drops this one. -->
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:fontFamily">@font/outfit_regular</item>
-        <item name="android:textViewStyle">@style/Widget.EGate.TextView</item>
-        <item name="android:editTextStyle">@style/Widget.EGate.EditText</item>
+        <item name="android:textViewStyle">@style/Widget.Projector.TextView</item>
+        <item name="android:editTextStyle">@style/Widget.Projector.EditText</item>
     </style>
 
-    <style name="Widget.EGate.TextView" parent="android:Widget.TextView">
+    <style name="Widget.Projector.TextView" parent="android:Widget.TextView">
         <item name="android:fontFamily">@font/outfit_regular</item>
     </style>
 
-    <style name="Widget.EGate.EditText" parent="Widget.AppCompat.EditText">
+    <style name="Widget.Projector.EditText" parent="Widget.AppCompat.EditText">
         <item name="android:fontFamily">@font/outfit_regular</item>
     </style>
 

@@ -190,7 +190,7 @@
         </LinearLayout>
 
         <!-- Apps / Settings tabs: vertical grid below the hero, same slot as the Home shelves -->
-        <com.cleanyourprojector.launcher.ui.FocusGridRecyclerView
+        <com.cleanbeam.launcher.ui.FocusGridRecyclerView
             android:id="@+id/apps_grid"
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -204,7 +204,7 @@
             app:layout_constraintStart_toStartOf="parent" />
 
         <!-- app row -->
-        <com.cleanyourprojector.launcher.ui.FocusRowRecyclerView
+        <com.cleanbeam.launcher.ui.FocusRowRecyclerView
             android:id="@+id/row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -215,7 +215,7 @@
             app:layout_constraintTop_toTopOf="@id/shelf_top"
             app:layout_constraintStart_toStartOf="parent" />
 
-        <com.cleanyourprojector.launcher.ui.ShelvesRecyclerView
+        <com.cleanbeam.launcher.ui.ShelvesRecyclerView
             android:id="@+id/shelves"
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -259,7 +259,7 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- every menu: slides in from the right edge, over everything else -->
-    <com.cleanyourprojector.launcher.ui.SidePanel
+    <com.cleanbeam.launcher.ui.SidePanel
         android:id="@+id/panel"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

@@ -31,7 +31,7 @@ class _PairScreenState extends State<PairScreen> {
   Future<void> _detected(BarcodeCapture capture) async {
     if (_busy) return;
     for (final b in capture.barcodes) {
-      debugPrint('[egate] qr: ${b.rawValue?.substring(0, (b.rawValue?.length ?? 0).clamp(0, 40))}');
+      debugPrint('[remote] qr: ${b.rawValue?.substring(0, (b.rawValue?.length ?? 0).clamp(0, 40))}');
       final p = Pairing.fromQrJson(b.rawValue ?? '');
       if (p != null) {
         setState(() => _busy = true);
@@ -146,7 +146,7 @@ class _ManualSheetState extends State<_ManualSheet> {
     var ip = name == null ? null : _found[name];
     if (ip == null && _ip.text.trim().isNotEmpty) {
       ip = _ip.text.trim();
-      name = 'EGate Atom3X';
+      name = 'Projector';
     }
     if (ip == null) {
       setState(() => _error = 'Pick a projector, or type its IP address (shown under the code on the projector).');
@@ -162,7 +162,8 @@ class _ManualSheetState extends State<_ManualSheet> {
       final token = t.pairedToken;
       await t.close();
       if (token == null) throw Exception('no token');
-      if (mounted) Navigator.of(context).pop(Pairing(name: name!, ip: ip, port: 7272, token: token));
+      final resolved = (t.pairedName ?? name ?? 'Projector').trim();
+      if (mounted) Navigator.of(context).pop(Pairing(name: resolved.isEmpty ? 'Projector' : resolved, ip: ip, port: 7272, token: token));
     } catch (e) {
       await t.close();
       setState(() {

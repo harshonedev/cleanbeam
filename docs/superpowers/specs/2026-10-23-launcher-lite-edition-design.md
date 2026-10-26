@@ -1,4 +1,4 @@
-# EGate launcher: Lite edition — Design
+# Projector launcher: Lite edition — Design
 
 **Date:** 2026-10-23
 **Scope:** `launcher/` only. A second build of the same launcher that needs no internet.
@@ -24,7 +24,7 @@ controls. The Lite edition is that: no catalogue, no network access at all, no A
 5. Full keeps today's behaviour exactly; the refactor only moves code.
 
 ## Non-goals
-- A separate package name or icon for Lite. Only the label differs ("EGate Home Lite").
+- A separate package name or icon for Lite. Only the label differs ("Clean Beam Home Lite").
 - Reworking the Settings tab or the side panel.
 - Touch, or any new remote behaviour.
 

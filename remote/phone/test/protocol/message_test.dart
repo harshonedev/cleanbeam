@@ -46,18 +46,18 @@ void main() {
       expect(jsonEncode(open('wifi')), '{"t":"open","id":"wifi"}');
     });
     test('auth_ok', () {
-      final e = parseEvent('{"t":"auth_ok","name":"EGate Atom3X","version":"1.0"}');
+      final e = parseEvent('{"t":"auth_ok","name":"Projector","version":"1.0"}');
       expect(e, isA<AuthOk>());
-      expect((e as AuthOk).name, 'EGate Atom3X');
+      expect((e as AuthOk).name, 'Projector');
     });
     test('auth_fail and pair_fail', () {
       expect(parseEvent('{"t":"auth_fail"}'), isA<AuthFail>());
       expect(parseEvent('{"t":"pair_fail"}'), isA<PairFail>());
     });
     test('pair_ok carries token', () {
-      final e = parseEvent('{"t":"pair_ok","token":"abc","name":"EGate Atom3X"}') as PairOk;
+      final e = parseEvent('{"t":"pair_ok","token":"abc","name":"Projector"}') as PairOk;
       expect(e.token, 'abc');
-      expect(e.name, 'EGate Atom3X');
+      expect(e.name, 'Projector');
     });
     test('apps list', () {
       final e = parseEvent('{"t":"apps","items":[{"pkg":"com.google.android.youtube.tv","label":"YouTube"}]}') as AppsEvent;

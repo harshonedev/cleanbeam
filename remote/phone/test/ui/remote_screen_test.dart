@@ -56,7 +56,6 @@ void main() {
       'btn-rew': 89,
       'btn-play': 85,
       'btn-ffwd': 90,
-      'btn-power-menu': 135,
     };
     for (final e in expected.entries) {
       await t.ensureVisible(find.byKey(Key(e.key)));
@@ -64,6 +63,10 @@ void main() {
       await t.pump();
       expect(sink.sent.last, {'t': 'key', 'code': e.value, 'action': 'tap'}, reason: e.key);
     }
+    await t.ensureVisible(find.byKey(const Key('btn-power-menu')));
+    await t.tap(find.byKey(const Key('btn-power-menu')));
+    await t.pump();
+    expect(sink.sent.last, {'t': 'power', 'action': 'menu'});
   });
 
   testWidgets('no wake button is shown', (t) async {

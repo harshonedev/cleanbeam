@@ -1,4 +1,4 @@
-# EGate Remote protocol
+# Clean Beam Remote protocol
 
 Single source of truth for both the projector receiver (`remote/receiver`) and the phone app (`remote/phone`).
 
@@ -6,8 +6,8 @@ Single source of truth for both the projector receiver (`remote/receiver`) and t
 
 | Transport | Details |
 |-----------|---------|
-| Wi-Fi | WebSocket `ws://<projector-ip>:7272/`, one JSON object per **text** frame. mDNS service `_egate-remote._tcp`, instance name `EGate Atom3X`, port 7272. App icons: `GET http://<projector-ip>:7273/icon/<pkg>` → `image/png` or 404. |
-| BLE | GATT server on the projector. Advertised local name `EGate Remote`, advertises the service UUID below. Phone requests MTU 512. Each JSON object is UTF-8 encoded then chunked (below). |
+| Wi-Fi | WebSocket `ws://<projector-ip>:7272/`, one JSON object per **text** frame. mDNS service `_cb-remote._tcp`, instance name is the projector's model, port 7272. App icons: `GET http://<projector-ip>:7273/icon/<pkg>` → `image/png` or 404. |
+| BLE | GATT server on the projector. The phone finds it by the service UUID below (the adapter name is the projector's own Bluetooth name). Phone requests MTU 512. Each JSON object is UTF-8 encoded then chunked (below). |
 
 ### BLE UUIDs
 
@@ -90,11 +90,11 @@ Examples:
 Examples:
 
 ```json
-{"t":"auth_ok","name":"EGate Atom3X","version":"1.0"}
+{"t":"auth_ok","name":"Projector","version":"1.0"}
 {"t":"auth_fail"}
-{"t":"pair_ok","token":"Z3VpZC10b2tlbi1iYXNlNjQ=","name":"EGate Atom3X"}
+{"t":"pair_ok","token":"Z3VpZC10b2tlbi1iYXNlNjQ=","name":"Projector"}
 {"t":"apps","items":[{"pkg":"com.google.android.youtube.tv","label":"YouTube"}]}
-{"t":"status","app":"com.cleanyourprojector.launcher","screenOn":true,"volume":7,"maxVolume":15,"ip":"192.168.10.56"}
+{"t":"status","app":"com.cleanbeam.launcher","screenOn":true,"volume":7,"maxVolume":15,"ip":"192.168.10.56"}
 {"t":"shortcuts","items":[{"id":"input","label":"Input source","group":"Projector"},{"id":"wifi","label":"Wi-Fi","group":"Network"}]}
 {"t":"pong"}
 {"t":"err","msg":"unknown type: foo"}
@@ -102,12 +102,12 @@ Examples:
 
 ## Why launches and shortcuts go through the helper
 
-Android refuses `startActivity` from the receiver's foreground service unless the receiver itself has a visible window ("Abort background activity starts"), so `launch` and `open` run `am start` in the injector helper, which is spawned by adbd as shell/root and exempt. `open` starts the resolved activity explicitly (`-n`) with `NEW_TASK|CLEAR_TASK`: the Atom 3X's Brightness screen has no `CATEGORY_DEFAULT` so an implicit `-a` start cannot resolve it, and the vendor settings screens share one task, where a plain `NEW_TASK` start piles screens up and never starts the one that is the task's root. Keys are injected with `INJECT_INPUT_EVENT_MODE_WAIT_FOR_RESULT`: with the async mode this firmware accepts D-pad keys but ignores HOME.
+Android refuses `startActivity` from the receiver's foreground service unless the receiver itself has a visible window ("Abort background activity starts"), so `launch` and `open` run `am start` in the injector helper, which is spawned by adbd as shell/root and exempt. `open` starts the resolved activity explicitly (`-n`) with `NEW_TASK|CLEAR_TASK`: some vendor screens (jixin Brightness is one) have no `CATEGORY_DEFAULT`, so an implicit `-a` start cannot resolve them, and those screens share one task, where a plain `NEW_TASK` start piles screens up and never starts the one that is the task's root. Keys are injected with `INJECT_INPUT_EVENT_MODE_WAIT_FOR_RESULT`: with the async mode some firmwares accept D-pad keys but ignore HOME.
 
 ## Pairing QR payload
 
 ```json
-{"v":1,"name":"EGate Atom3X","ip":"192.168.10.52","port":7272,"token":"<base64 of 32 random bytes>"}
+{"v":1,"name":"Living Room","ip":"192.168.10.52","port":7272,"token":"<base64 of 32 random bytes>"}
 ```
 
 The phone identifies the projector over BLE by the service UUID (Android apps cannot read the adapter MAC and the advertiser uses a random address).
@@ -124,15 +124,11 @@ The phone identifies the projector over BLE by the service UUID (Android apps ca
 | Enter / Delete | 66 / 67 |
 | Power / Sleep / Wakeup | 26 / 223 / 224 |
 
-## Projector-specific keys ("Extra" row)
+## Power menu
 
-Measured on the device (2026-10-23) by injecting each keycode the IR keypad (`ir_keypad`, `/dev/input/event0`) can emit:
+`{"t":"power","action":"menu"}` is the phone's **Power menu** button.
 
-| Keycode | IR button | Effect | Phone UI |
-|---------|-----------|--------|----------|
-| 135 (F5) | Power | Opens the projector power menu: Reboot / Screen Off / Power Off (auto power-off after 20 s) / Timing Switch Off | **"Power menu"** button in the Extra row |
-| 131 (F1), 140 (F10) | unknown | No visible effect on the launcher | not exposed |
-| 137 (F7) | hidden | Opens `com.jixin.factorytest` | not exposed |
-| 139 (F9) | hidden | Opens Android TV developer options | not exposed |
+- On a box with the jixin settings package, the helper taps keycode 135, which is the IR power key on those boards and opens their menu (reboot, screen off, power off).
+- On every other Android projector it holds `KEYCODE_POWER` (26) long enough to open Android's own power dialog. A short tap of 26 sleeps the panel, so the phone does not send a short tap.
 
-Power facts: both `KEYCODE_SLEEP` (223) and the menu's "Screen Off" put the box into full suspend: Wi-Fi drops, adbd dies, Wake-on-LAN magic packets are ignored. Nothing the phone sends can wake it. The phone therefore shows no "wake" button; `power wake` stays in the protocol for a future firmware that keeps radios on.
+`power sleep` (`KEYCODE_SLEEP`, 223) and a vendor menu's "Screen Off" put many projectors into full suspend: Wi-Fi drops and nothing the phone sends can wake them. The phone therefore shows no wake button; `power wake` stays in the protocol for a firmware that keeps radios on.
